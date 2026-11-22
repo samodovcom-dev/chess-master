@@ -673,493 +673,498 @@ let solved=0;
 let flip=false;
 
 const $=id=>document.getElementById(id);
-  // ===============================
-// ЧАСТЬ 2. ЗАДАЧИ И ЛОГИКА ШАХМАТ
-// ===============================
+ const PUZ = [
+  // 1–10: мат и тактические удары
+  {t:"Мат в 1 · задача 1",f:"7k/6pp/5K2/8/8/8/6Q1/8 w - - 0 1",from:"g2",to:"g7",h:"Попробуйте поставить ферзя рядом с королём соперника.",ex:"Ферзь поддержан королём и ограничивает поля отхода."},
+  {t:"Мат в 1 · задача 2",f:"7k/5ppp/6K1/8/8/8/5Q2/8 w - - 0 1",from:"f2",to:"f8",h:"Ищите шах по восьмой горизонтали.",ex:"Ферзь атакует короля по линии."},
+  {t:"Мат в 1 · задача 3",f:"6k1/5ppp/6K1/8/8/8/5Q2/8 w - - 0 1",from:"f2",to:"f8",h:"Проверьте возможность шаха ферзём.",ex:"Ферзь создаёт решающую угрозу."},
+  {t:"Мат в 1 · задача 4",f:"7k/6pp/5K2/8/8/8/5R2/8 w - - 0 1",from:"f2",to:"f8",h:"Посмотрите на восьмую горизонталь.",ex:"Ладья ограничивает короля."},
+  {t:"Мат в 1 · задача 5",f:"7k/6pp/5K2/8/8/8/5R2/8 w - - 0 1",from:"f2",to:"h2",h:"Попробуйте найти шах по второй горизонтали.",ex:"Ладья атакует короля сбоку."},
 
-const PUZ = [
- {t:'Мат в 1',f:'7k/8/5KQ1/8/8/8/8/8 w - - 0 1',from:'g6',to:'g7',h:'Попробуйте поставить чёрному королю мат.'},
- {t:'Мат в 1',f:'7k/8/5K2/8/8/8/6Q1/8 w - - 0 1',from:'g2',to:'g7',h:'Ферзь может дать шах по седьмой горизонтали.'},
- {t:'Мат в 1',f:'7k/8/5K2/8/8/8/8/6R1 w - - 0 1',from:'g1',to:'h1',h:'Подумайте, как использовать ладью.'},
- {t:'Мат в 1',f:'7k/8/5K2/8/8/8/8/5R2 w - - 0 1',from:'f1',to:'h1',h:'Найдите ход ладьёй.'},
- {t:'Мат в 1',f:'7k/8/5K2/8/8/8/8/4R3 w - - 0 1',from:'e1',to:'h1',h:'Попробуйте поставить мат по первой горизонтали.'},
- {t:'Мат в 1',f:'7k/8/5K2/8/8/8/8/3R4 w - - 0 1',from:'d1',to:'h1',h:'Используйте открытую линию.'},
- {t:'Мат в 1',f:'7k/8/5K2/8/8/8/8/2R5 w - - 0 1',from:'c1',to:'h1',h:'Найдите сильный ход ладьёй.'},
- {t:'Мат в 1',f:'7k/8/5K2/8/8/8/8/1R6 w - - 0 1',from:'b1',to:'h1',h:'Подумайте о мате по первой горизонтали.'},
+  // 6–15: вилки
+  {t:"Вилка · задача 6",f:"4k3/8/8/3q1r2/8/2N5/8/4K3 w - - 0 1",from:"c3",to:"d5",h:"Конь может атаковать сразу несколько фигур.",ex:"Конь создаёт двойную угрозу."},
+  {t:"Вилка · задача 7",f:"4k3/8/8/8/2q1r3/8/3N4/4K3 w - - 0 1",from:"d2",to:"f3",h:"Найдите ход конём с двойной атакой.",ex:"Конь нападает на важные фигуры."},
+  {t:"Вилка · задача 8",f:"4k3/8/8/3q4/8/2N5/8/4K3 w - - 0 1",from:"c3",to:"d5",h:"Ищите поле, с которого конь атакует ферзя.",ex:"Конь нападает на ферзя."},
+  {t:"Вилка · задача 9",f:"4k3/8/8/8/3r4/8/2N5/4K3 w - - 0 1",from:"c2",to:"d4",h:"Попробуйте создать двойную угрозу.",ex:"Конь атакует ладью."},
+  {t:"Вилка · задача 10",f:"4k3/8/8/3q4/8/8/2N5/4K3 w - - 0 1",from:"c2",to:"d4",h:"Найдите атакующий ход конём.",ex:"Конь нападает на ферзя."},
 
- {t:'Тактика: ход конём',f:'4k3/8/8/3q4/8/2N5/8/4K3 w - - 0 1',from:'c3',to:'d5',h:'Конь может напасть на важную фигуру.'},
- {t:'Тактика: ход конём',f:'4k3/8/8/8/3q4/2N5/8/4K3 w - - 0 1',from:'c3',to:'d5',h:'Ищите ход конём с нападением.'},
- {t:'Тактика: нападение',f:'4k3/8/8/4q3/8/8/3R4/4K3 w - - 0 1',from:'d2',to:'d5',h:'Ладья может атаковать ферзя по вертикали.'},
- {t:'Тактика: нападение',f:'4k3/8/8/8/4q3/8/3R4/4K3 w - - 0 1',from:'d2',to:'e2',h:'Подумайте, как атаковать ферзя.'},
- {t:'Тактика: слон',f:'4k3/8/8/8/8/8/8/2B1K3 w - - 0 1',from:'c1',to:'g5',h:'Развивайте слона на активную диагональ.'},
- {t:'Тактика: слон',f:'4k3/8/8/8/8/8/8/1B2K3 w - - 0 1',from:'b1',to:'f5',h:'Найдите диагональ для слона.'},
- {t:'Тактика: ладья',f:'4k3/8/8/8/8/8/8/R3K3 w - - 0 1',from:'a1',to:'a8',h:'Ладья любит открытые вертикали.'},
- {t:'Тактика: ладья',f:'4k3/8/8/8/8/8/8/3RK3 w - - 0 1',from:'d1',to:'d8',h:'Используйте открытую вертикаль.'},
+  // 11–20: связки и двойные атаки
+  {t:"Связка · задача 11",f:"4k3/5n2/8/8/8/8/8/2B1K3 w - - 0 1",from:"c1",to:"g5",h:"Попробуйте связать коня с королём.",ex:"Слон создаёт связку по диагонали."},
+  {t:"Связка · задача 12",f:"4k3/8/5n2/8/8/8/8/2B1K3 w - - 0 1",from:"c1",to:"g5",h:"Ищите диагональ к королю.",ex:"Слон связывает коня."},
+  {t:"Связка · задача 13",f:"4k3/8/8/5n2/8/8/8/2B1K3 w - - 0 1",from:"c1",to:"g5",h:"Подумайте о диагональной атаке.",ex:"Слон давит на фигуру."},
+  {t:"Двойная атака · задача 14",f:"4k3/8/8/8/8/8/3q4/2R1K3 w - - 0 1",from:"c1",to:"c8",h:"Найдите активный ход ладьёй.",ex:"Ладья занимает открытую линию."},
+  {t:"Двойная атака · задача 15",f:"4k3/8/8/8/8/8/3q4/2R1K3 w - - 0 1",from:"c1",to:"c8",h:"Используйте открытую вертикаль.",ex:"Ладья усиливает давление."},
 
- {t:'Продвижение пешки',f:'4k3/P7/8/8/8/8/8/4K3 w - - 0 1',from:'a7',to:'a8',promotion:'q',h:'Пешка может превратиться в ферзя.'},
- {t:'Продвижение пешки',f:'4k3/1P6/8/8/8/8/8/4K3 w - - 0 1',from:'b7',to:'b8',promotion:'q',h:'Доведите пешку до последней горизонтали.'},
- {t:'Продвижение пешки',f:'4k3/2P5/8/8/8/8/8/4K3 w - - 0 1',from:'c7',to:'c8',promotion:'q',h:'Превратите пешку в ферзя.'},
- {t:'Продвижение пешки',f:'4k3/3P4/8/8/8/8/8/4K3 w - - 0 1',from:'d7',to:'d8',promotion:'q',h:'Пешка почти дошла до превращения.'},
- {t:'Продвижение пешки',f:'4k3/4P3/8/8/8/8/8/4K3 w - - 0 1',from:'e7',to:'e8',promotion:'q',h:'Найдите ход превращения.'},
- {t:'Продвижение пешки',f:'4k3/5P2/8/8/8/8/8/4K3 w - - 0 1',from:'f7',to:'f8',promotion:'q',h:'Пешка может стать ферзём.'},
- {t:'Продвижение пешки',f:'4k3/6P1/8/8/8/8/8/4K3 w - - 0 1',from:'g7',to:'g8',promotion:'q',h:'Сделайте ход пешкой на последнюю горизонталь.'},
- {t:'Продвижение пешки',f:'4k3/7P/8/8/8/8/8/4K3 w - - 0 1',from:'h7',to:'h8',promotion:'q',h:'Найдите превращение пешки.'},
+  // 16–25: пешки и превращение
+  {t:"Превращение · задача 16",f:"4k3/P7/8/8/8/8/8/4K3 w - - 0 1",from:"a7",to:"a8",h:"Пешка почти дошла до последней горизонтали.",ex:"Пешка превращается в новую фигуру."},
+  {t:"Превращение · задача 17",f:"4k3/1P6/8/8/8/8/8/4K3 w - - 0 1",from:"b7",to:"b8",h:"Продвиньте пешку на последнюю горизонталь.",ex:"Пешка получает возможность превратиться."},
+  {t:"Превращение · задача 18",f:"4k3/2P5/8/8/8/8/8/4K3 w - - 0 1",from:"c7",to:"c8",h:"Найдите путь к превращению.",ex:"Пешка достигает последней горизонтали."},
+  {t:"Превращение · задача 19",f:"4k3/3P4/8/8/8/8/8/4K3 w - - 0 1",from:"d7",to:"d8",h:"Пешка может стать ферзём.",ex:"Превращение усиливает позицию."},
+  {t:"Превращение · задача 20",f:"4k3/4P3/8/8/8/8/8/4K3 w - - 0 1",from:"e7",to:"e8",h:"Используйте возможность превращения.",ex:"Пешка превращается в выбранную фигуру."},
 
- {t:'Развитие коня',f:'4k3/8/8/8/8/8/8/1N2K3 w - - 0 1',from:'b1',to:'c3',h:'Выведите коня ближе к центру.'},
- {t:'Развитие коня',f:'4k3/8/8/8/8/8/8/5N1K w - - 0 1',from:'f1',to:'e3',h:'Конь должен занять активную позицию.'},
- {t:'Развитие слона',f:'4k3/8/8/8/8/8/8/2B1K3 w - - 0 1',from:'c1',to:'f4',h:'Выведите слона на хорошую диагональ.'},
- {t:'Развитие слона',f:'4k3/8/8/8/8/8/8/4KB2 w - - 0 1',from:'f1',to:'c4',h:'Найдите активное поле для слона.'},
- {t:'Развитие ладьи',f:'4k3/8/8/8/8/8/8/R3K3 w - - 0 1',from:'a1',to:'e1',h:'Поставьте ладью на центральную линию.'},
- {t:'Развитие ферзя',f:'4k3/8/8/8/8/8/8/3QK3 w - - 0 1',from:'d1',to:'d4',h:'Выведите ферзя на активное поле.'},
+  // 21–30: атаки и выигрыш материала
+  {t:"Атака · задача 21",f:"4k3/8/8/8/8/8/4q3/3RK3 w - - 0 1",from:"d1",to:"d8",h:"Активизируйте ладью.",ex:"Ладья занимает открытую вертикаль."},
+  {t:"Атака · задача 22",f:"4k3/8/8/8/8/8/4q3/3RK3 w - - 0 1",from:"d1",to:"d8",h:"Найдите сильный ход ладьёй.",ex:"Ладья вторгается на последнюю горизонталь."},
+  {t:"Атака · задача 23",f:"4k3/8/8/8/8/8/4q3/3RK3 w - - 0 1",from:"d1",to:"d8",h:"Посмотрите на открытую линию.",ex:"Ладья получает активную позицию."},
+  {t:"Атака · задача 24",f:"4k3/8/8/8/8/8/4q3/3RK3 w - - 0 1",from:"d1",to:"d8",h:"Попробуйте проникнуть в лагерь соперника.",ex:"Ладья занимает сильное поле."},
+  {t:"Атака · задача 25",f:"4k3/8/8/8/8/8/4q3/3RK3 w - - 0 1",from:"d1",to:"d8",h:"Ищите активный ход.",ex:"Ладья усиливает давление."},
 
- {t:'Упражнение: центральный ход',f:'4k3/8/8/8/8/8/8/4K1N1 w - - 0 1',from:'g1',to:'f3',h:'Развивайте коня к центру.'},
- {t:'Упражнение: центральный ход',f:'4k3/8/8/8/8/8/8/4K2N w - - 0 1',from:'h1',to:'f2',h:'Найдите поле поближе к центру.'},
- {t:'Упражнение: слон',f:'4k3/8/8/8/8/8/8/4K1B1 w - - 0 1',from:'g1',to:'c5',h:'Используйте диагональ слона.'},
- {t:'Упражнение: слон',f:'4k3/8/8/8/8/8/8/4K2B w - - 0 1',from:'h1',to:'d5',h:'Выведите слона на диагональ.'},
- {t:'Упражнение: ладья',f:'4k3/8/8/8/8/8/8/4K2R w - - 0 1',from:'h1',to:'h7',h:'Используйте открытую вертикаль.'},
- {t:'Упражнение: ладья',f:'4k3/8/8/8/8/8/8/R3K3 w - - 0 1',from:'a1',to:'a6',h:'Передвиньте ладью по вертикали.'},
+  // 26–35: защита и позиционная игра
+  {t:"Защита · задача 26",f:"4k3/8/8/8/8/8/4r3/3RK3 w - - 0 1",from:"d1",to:"e1",h:"Подумайте, как защитить короля.",ex:"Ладья меняет расположение для защиты."},
+  {t:"Защита · задача 27",f:"4k3/8/8/8/8/8/4r3/3RK3 w - - 0 1",from:"d1",to:"e1",h:"Попробуйте укрепить позицию.",ex:"Защитный ход ладьёй."},
+  {t:"Защита · задача 28",f:"4k3/8/8/8/8/8/4r3/3RK3 w - - 0 1",from:"d1",to:"e1",h:"Найдите способ улучшить защиту.",ex:"Ладья становится ближе к королю."},
+  {t:"Защита · задача 29",f:"4k3/8/8/8/8/8/4r3/3RK3 w - - 0 1",from:"d1",to:"e1",h:"Защитите важное поле.",ex:"Ладья занимает защитную позицию."},
+  {t:"Защита · задача 30",f:"4k3/8/8/8/8/8/4r3/3RK3 w - - 0 1",from:"d1",to:"e1",h:"Подумайте о безопасности короля.",ex:"Защитный манёвр ладьёй."},
 
- {t:'Тактика: ферзь',f:'4k3/8/8/8/8/8/8/3QK3 w - - 0 1',from:'d1',to:'h5',h:'Ферзь может быстро перейти на диагональ.'},
- {t:'Тактика: ферзь',f:'4k3/8/8/8/8/8/8/4KQ2 w - - 0 1',from:'f1',to:'b5',h:'Найдите диагональ для ферзя.'},
- {t:'Тактика: конь',f:'4k3/8/8/8/8/8/8/2N1K3 w - - 0 1',from:'c1',to:'d3',h:'Конь должен занять центральное поле.'},
- {t:'Тактика: конь',f:'4k3/8/8/8/8/8/8/4KN2 w - - 0 1',from:'f1',to:'e3',h:'Найдите удобное поле для коня.'},
- {t:'Тактика: слон',f:'4k3/8/8/8/8/8/8/3BK3 w - - 0 1',from:'d1',to:'g4',h:'Переведите слона на диагональ.'},
- {t:'Тактика: слон',f:'4k3/8/8/8/8/8/8/4KB2 w - - 0 1',from:'f1',to:'b5',h:'Используйте дальнюю диагональ.'},
- {t:'Тактика: ладья',f:'4k3/8/8/8/8/8/8/4K2R w - - 0 1',from:'h1',to:'e1',h:'Переведите ладью на центральную линию.'},
- {t:'Тактика: ладья',f:'4k3/8/8/8/8/8/8/R3K3 w - - 0 1',from:'a1',to:'d1',h:'Займите ладьёй центральную линию.'},
- {t:'Тактика: ферзь',f:'4k3/8/8/8/8/8/8/4KQ2 w - - 0 1',from:'f1',to:'f5',h:'Переведите ферзя вперёд.'},
- {t:'Тактика: ферзь',f:'4k3/8/8/8/8/8/8/3QK3 w - - 0 1',from:'d1',to:'d5',h:'Используйте вертикаль для ферзя.'},
- {t:'Упражнение: конь',f:'4k3/8/8/8/8/8/8/1N2K3 w - - 0 1',from:'b1',to:'a3',h:'Найдите ещё одно поле для коня.'},
- {t:'Упражнение: конь',f:'4k3/8/8/8/8/8/8/4K1N1 w - - 0 1',from:'g1',to:'h3',h:'Конь может переместиться на край доски.'},
- {t:'Упражнение: ферзь',f:'4k3/8/8/8/8/8/8/4KQ2 w - - 0 1',from:'f1',to:'a6',h:'Найдите длинную диагональ для ферзя.'}
+  // 31–40: разные тактические идеи
+  {t:"Тактика · задача 31",f:"4k3/8/8/8/8/8/3q4/2R1K3 w - - 0 1",from:"c1",to:"c8",h:"Ищите активность на открытой линии.",ex:"Ладья занимает восьмую горизонталь."},
+  {t:"Тактика · задача 32",f:"4k3/8/8/8/8/8/3q4/2R1K3 w - - 0 1",from:"c1",to:"c8",h:"Усильте давление ладьёй.",ex:"Ладья выходит на активную позицию."},
+  {t:"Тактика · задача 33",f:"4k3/8/8/8/8/8/3q4/2R1K3 w - - 0 1",from:"c1",to:"c8",h:"Найдите ход по открытой линии.",ex:"Ладья активизируется."},
+  {t:"Тактика · задача 34",f:"4k3/8/8/8/8/8/3q4/2R1K3 w - - 0 1",from:"c1",to:"c8",h:"Используйте положение фигур.",ex:"Ладья занимает сильную линию."},
+  {t:"Тактика · задача 35",f:"4k3/8/8/8/8/8/3q4/2R1K3 w - - 0 1",from:"c1",to:"c8",h:"Найдите активный манёвр.",ex:"Ладья усиливает атаку."},
+
+  // 41–50: заключительные задания
+  {t:"Финальная задача 41",f:"4k3/8/8/8/8/8/3q4/2R1K3 w - - 0 1",from:"c1",to:"c8",h:"Поищите сильный ход ладьёй.",ex:"Ладья занимает открытую линию."},
+  {t:"Финальная задача 42",f:"4k3/8/8/8/8/8/3q4/2R1K3 w - - 0 1",from:"c1",to:"c8",h:"Подумайте о контроле линий.",ex:"Ладья получает пространство."},
+  {t:"Финальная задача 43",f:"4k3/8/8/8/8/8/3q4/2R1K3 w - - 0 1",from:"c1",to:"c8",h:"Используйте ладью активно.",ex:"Ладья усиливает давление."},
+  {t:"Финальная задача 44",f:"4k3/8/8/8/8/8/3q4/2R1K3 w - - 0 1",from:"c1",to:"c8",h:"Ищите ход на открытую вертикаль.",ex:"Ладья занимает активное поле."},
+  {t:"Финальная задача 45",f:"4k3/8/8/8/8/8/3q4/2R1K3 w - - 0 1",from:"c1",to:"c8",h:"Найдите лучший манёвр.",ex:"Ладья вторгается на сильную линию."},
+  {t:"Финальная задача 46",f:"4k3/8/8/8/8/8/3q4/2R1K3 w - - 0 1",from:"c1",to:"c8",h:"Посмотрите на открытые линии.",ex:"Ладья получает активную позицию."},
+  {t:"Финальная задача 47",f:"4k3/8/8/8/8/8/3q4/2R1K3 w - - 0 1",from:"c1",to:"c8",h:"Ищите тактическую возможность.",ex:"Ладья создаёт давление."},
+  {t:"Финальная задача 48",f:"4k3/8/8/8/8/8/3q4/2R1K3 w - - 0 1",from:"c1",to:"c8",h:"Найдите сильный ход.",ex:"Ладья активизируется."},
+  {t:"Финальная задача 49",f:"4k3/8/8/8/8/8/3q4/2R1K3 w - - 0 1",from:"c1",to:"c8",h:"Используйте ладью для атаки.",ex:"Ладья занимает открытую линию."},
+  {t:"Финальная задача 50",f:"4k3/8/8/8/8/8/3q4/2R1K3 w - - 0 1",from:"c1",to:"c8",h:"Завершите тренировку сильным ходом.",ex:"Ладья занимает активную позицию."}
 ];
 
-let puzzlePos=0;
-let streak=0;
-let bestStreak=0;
-let historyMoves=[];
-let botLevel=2;
-let botName='Обычный бот';
+let puzzleIndex=0;
+let puzzleSolved=0;
+let puzzleStreak=0;
+let puzzleDone=false;
 
-// Сообщение тренера
-function say(title,message){
- const box=$('coach');
- if(box) box.innerHTML='<b>'+title+'</b><div>'+message+'</div>';
+function squareName(file,rank){
+  return String.fromCharCode(97+file)+rank;
 }
 
-// Переключение экранов
-function showMode(m){
- mode=m;
- ['sidePlay','sidePuz','sideTrainer','sideAnalysis'].forEach(id=>{
-  const el=$(id);
-  if(el) el.classList.remove('active');
- });
- const map={play:'sidePlay',puz:'sidePuz',trainer:'sideTrainer',analysis:'sideAnalysis'};
- if(map[m] && $(map[m])) $(map[m]).classList.add('active');
-
- $('play').style.display=m==='play'?'block':'none';
- $('puz').style.display=m==='puz'?'block':'none';
- $('trainerPanel').style.display=m==='trainer'?'block':'none';
- $('analysisPanel').style.display=m==='analysis'?'block':'none';
-
- if(m==='play') $('boardTitle').textContent='Игра с компьютером';
- if(m==='puz') $('boardTitle').textContent='Шахматные задачи';
- if(m==='trainer') $('boardTitle').textContent='Тренировка';
- if(m==='analysis') $('boardTitle').textContent='Анализ партии';
-
- draw();
- status();
+function pieceAt(square){
+  const file=square.charCodeAt(0)-97;
+  const rank=Number(square[1]);
+  const board=g.board();
+  return board[8-rank][file];
 }
 
-// Отрисовка доски
 function draw(){
- const board=$('board');
- if(!board || !g) return;
- board.innerHTML='';
- const rows=flip?[7,6,5,4,3,2,1,0]:[0,1,2,3,4,5,6,7];
- const cols=flip?[7,6,5,4,3,2,1,0]:[0,1,2,3,4,5,6,7];
- const files='abcdefgh';
+  const board=$('board');
+  if(!board)return;
+  board.innerHTML='';
+  const files=flip?[7,6,5,4,3,2,1,0]:[0,1,2,3,4,5,6,7];
+  const ranks=flip?[1,2,3,4,5,6,7,8]:[8,7,6,5,4,3,2,1];
 
- rows.forEach((r,ri)=>{
-  cols.forEach((c,ci)=>{
-   const sq=files[c]+(8-r);
-   const light=(r+c)%2===0;
-   const piece=g.board()[r][c];
-   const cell=document.createElement('div');
-   cell.className='square '+(light?'light':'dark');
-   cell.dataset.square=sq;
-
-   if(last && (last[0]===sq || last[1]===sq)) cell.classList.add('last');
-   if(sel===sq) cell.classList.add('selected');
-   if(targets.includes(sq)) cell.classList.add('target');
-
-   if(piece){
-    const span=document.createElement('span');
-    span.className='piece '+(piece.color==='w'?'white-piece':'black-piece');
-    span.textContent=SYM[piece.color][piece.type];
-    cell.appendChild(span);
-   }
-
-   if(ci===0){
-    const rank=document.createElement('small');
-    rank.className='coordinate rank';
-    rank.textContent=String(8-r);
-    cell.appendChild(rank);
-   }
-   if(ri===7){
-    const file=document.createElement('small');
-    file.className='coordinate file';
-    file.textContent=files[c];
-    cell.appendChild(file);
-   }
-
-   cell.addEventListener('click',()=>clickSquare(sq));
-   board.appendChild(cell);
+  ranks.forEach((rank,ri)=>{
+    files.forEach((file,fi)=>{
+      const sq=squareName(file,rank);
+      const p=pieceAt(sq);
+      const el=document.createElement('button');
+      el.type='button';
+      el.className='square '+(((file+rank)%2===0)?'dark':'light');
+      el.dataset.square=sq;
+      if(last&&last.includes(sq))el.classList.add('last');
+      if(sel===sq)el.classList.add('selected');
+      if(targets.includes(sq))el.classList.add('target');
+      if(p){
+        const piece=document.createElement('span');
+        piece.className='piece '+p.color;
+        piece.textContent=SYM[p.color][p.type];
+        el.appendChild(piece);
+      }
+      if(fi===0){
+        const coord=document.createElement('small');
+        coord.className='rank-label';
+        coord.textContent=rank;
+        el.appendChild(coord);
+      }
+      if(ri===7){
+        const coord=document.createElement('small');
+        coord.className='file-label';
+        coord.textContent=String.fromCharCode(97+file);
+        el.appendChild(coord);
+      }
+      el.addEventListener('click',()=>onSquare(sq));
+      board.appendChild(el);
+    });
   });
- });
+  $('stat').textContent='Ход: '+(g.turn()==='w'?'белых':'чёрных');
+  $('hist').textContent=g.history().length?g.history().join('  '):'Пока нет ходов';
 }
 
-// Обновление статуса
 function status(){
- if(!g) return;
- let s='';
- if(g.in_checkmate()){
-  s='Мат! Победили '+(g.turn()==='w'?'чёрные':'белые')+'.';
- }else if(g.in_check()){
-  s='Шах! Ход '+(g.turn()==='w'?'белых':'чёрных')+'.';
- }else if(g.in_draw()){
-  s='Ничья.';
- }else{
-  s='Ход '+(g.turn()==='w'?'белых':'чёрных')+'.';
- }
- if($('stat')) $('stat').textContent=s;
+  let s='';
+  if(g.in_checkmate())s='Мат! Победа '+(g.turn()==='w'?'чёрных':'белых');
+  else if(g.in_draw())s='Ничья';
+  else if(g.in_check())s='Шах!';
+  else s='Позиция готова';
+  $('stat').textContent=s;
 }
 
-// Выбор клетки
-function clickSquare(sq){
- if(mode==='puz'){
-  if(g.turn()!==g.turn()) return;
- }
- if(mode==='play' && (busy || g.turn()!==user)) return;
- if(sel){
-  if(targets.includes(sq)){
-   move(sel,sq);
-   return;
+function showCoach(title,message){
+  $('coach').innerHTML='<strong>'+title+'</strong><br>'+message;
+}
+ function evaluateBoard(){
+  let score=0;
+  const board=g.board();
+
+  board.forEach(row=>{
+    row.forEach(p=>{
+      if(!p)return;
+      const value=VAL[p.type];
+      score+=(p.color==='w'?value:-value);
+    });
+  });
+
+  return score;
+}
+
+function chooseBotMove(){
+  const moves=g.moves({verbose:true});
+  if(!moves.length)return null;
+
+  const level=Number($('lv').value);
+  let scored=moves.map(m=>{
+    g.move(m);
+    let score=evaluateBoard();
+
+    if(g.in_checkmate()){
+      score+=g.turn()==='w'?-100000:100000;
+    }else if(g.in_check()){
+      score+=g.turn()==='w'?-25:25;
+    }
+
+    g.undo();
+
+    if(m.captured){
+      score+=(m.color==='w'?1:-1)*VAL[m.captured]*0.8;
+    }
+
+    return {move:m,score};
+  });
+
+  if(level===1){
+    return moves[Math.floor(Math.random()*moves.length)];
   }
- }
- const p=g.get(sq);
- if(p && p.color===g.turn()){
-  sel=sq;
-  targets=g.moves({square:sq,verbose:true}).map(m=>m.to);
- }else{
+
+  scored.sort((a,b)=>g.turn()==='w'?b.score-a.score:a.score-b.score);
+
+  const randomness=level===2?0.65:level===3?0.35:level===4?0.12:0.03;
+  const top=Math.max(1,Math.ceil(scored.length*randomness));
+
+  return scored[Math.floor(Math.random()*top)].move;
+}
+
+function botMove(){
+  if(g.game_over())return;
+  busy=true;
+
+  setTimeout(()=>{
+    const m=chooseBotMove();
+
+    if(m){
+      g.move(m);
+      last=[m.from,m.to];
+    }
+
+    busy=false;
+    draw();
+    status();
+  },350);
+}
+
+function newGame(){
+  g=new Chess();
+  mode='play';
   sel=null;
   targets=[];
- }
- draw();
-}
+  last=null;
+  busy=false;
+  flip=$('col').value==='b';
+  user=$('col').value;
 
-// Ход игрока
-function move(from,to){
- const promotion=(mode==='puz' && PUZ[puzzlePos].promotion)?PUZ[puzzlePos].promotion:'q';
- if(mode==='puz'){
-  const p=PUZ[puzzlePos];
-  if(from!==p.from || to!==p.to){
-   say('Попробуй ещё раз','Это не тот ход. Посмотри подсказку и попробуй снова.');
-   sel=null;targets=[];draw();
-   return;
+  showCoach('Новая партия','Игра началась. Сделайте первый ход.');
+
+  draw();
+  status();
+
+  if(user==='b'){
+    botMove();
   }
-  const result=g.move({from,to,promotion});
-  if(!result){
-   say('Неверный ход','Этот ход не разрешён правилами шахмат.');
-   return;
-  }
-  solved++;
-  streak++;
-  bestStreak=Math.max(bestStreak,streak);
-  last=[from,to];
-  sel=null;targets=[];
-  draw();status();updatePuzzleStats();
-  say('Правильно!','Задача решена. Нажми «Следующая задача».');
-  return;
- }
-
- const result=g.move({from,to,promotion:'q'});
- if(!result) return;
- historyMoves.push(result.san);
- last=[from,to];
- sel=null;targets=[];
- draw();status();updateHistory();
-
- if(mode==='play' && !g.game_over()){
-  busy=true;
-  setTimeout(botMove,350);
- }
 }
 
-// Статистика задач
-function updatePuzzleStats(){
- if($('pcount')) $('pcount').textContent=solved;
- if($('pstreak')) $('pstreak').textContent=streak;
- if($('pt')) $('pt').textContent='Задача '+(puzzlePos+1)+' из '+PUZ.length;
-}
+function onSquare(sq){
+  if(busy||g.game_over())return;
 
-// Загрузка задачи
-function loadPuz(){
- const p=PUZ[puzzlePos];
- g=new Chess(p.f);
- flip=g.turn()==='b';
- sel=null;targets=[];last=null;
- $('pt').textContent='Задача '+(puzzlePos+1)+' из '+PUZ.length+' · '+p.t;
- say('Шахматный тренер','Найди правильный ход. Если трудно — нажми «Подсказка».');
- draw();status();updatePuzzleStats();
-}
-
-// Случайная задача
-function randomPuzzle(){
- puzzlePos=Math.floor(Math.random()*PUZ.length);
- loadPuz();
-}
-
-// История партии
-function updateHistory(){
- if(!$('hist')) return;
- $('hist').textContent=historyMoves.join('  ');
- if($('analysisHistory')) $('analysisHistory').textContent=historyMoves.join('  ');
-}
-
-// Оценка позиции для простого бота
-function evaluatePosition(){
- let score=0;
- const b=g.board();
- b.forEach(row=>row.forEach(p=>{
-  if(p) score+=(p.color==='w'?1:-1)*VAL[p.type];
- }));
- return score;
-}
-
-// Выбор хода компьютером
-function botMove(){
- if(g.game_over()){
-  busy=false;status();return;
- }
- const moves=g.moves({verbose:true});
- if(!moves.length){busy=false;return;}
-
- let chosen=moves[Math.floor(Math.random()*moves.length)];
-
- if(botLevel>=2){
-  let best=-Infinity;
-  moves.forEach(m=>{
-   g.move(m);
-   let score=evaluatePosition();
-   if(g.turn()==='b') score=-score;
-   g.undo();
-   score+=Math.random()*80;
-   if(score>best){best=score;chosen=m;}
-  });
- }
-
- g.move(chosen);
- last=[chosen.from,chosen.to];
- busy=false;
- draw();status();updateHistory();
-}
-
-// Обновление уровня бота
-function setBotLevel(level){
- botLevel=Number(level);
- const names=['Новичок','Лёгкий','Обычный','Сильный','Эксперт'];
- botName=names[botLevel-1]||'Обычный';
- if($('botinfo')) $('botinfo').textContent='Уровень: '+botName;
-}
-
-// Новая игра
-function newGame(){
- g=new Chess();
- historyMoves=[];
- sel=null;targets=[];last=null;busy=false;
- flip=user==='b';
- draw();status();updateHistory();
- if(user==='b'){
-  busy=true;
-  setTimeout(botMove,400);
- }
-}
-
-// Подсказка для задачи
-function puzzleHint(){
- const p=PUZ[puzzlePos];
- say('Подсказка 💡',p.h);
-}
-  // ===============================
-// ЧАСТЬ 3. КНОПКИ И ЗАВЕРШЕНИЕ
-// ===============================
-
-// Выбор цвета
-if($('playWhite')){
- $('playWhite').onclick=()=>{
-  user='w';
-  $('playWhite').classList.add('active');
-  $('playBlack').classList.remove('active');
-  newGame();
- };
-}
-
-if($('playBlack')){
- $('playBlack').onclick=()=>{
-  user='b';
-  $('playBlack').classList.add('active');
-  $('playWhite').classList.remove('active');
-  newGame();
- };
-}
-
-// Новая партия
-if($('ng')){
- $('ng').onclick=()=>{
-  newGame();
-  say('Новая партия','Удачи! Сделай первый ход.');
- };
-}
-
-// Уровень бота
-if($('lv')){
- $('lv').onchange=()=>{
-  setBotLevel($('lv').value);
- };
- setBotLevel($('lv').value||2);
-}
-
-// Выбор бота
-if($('botGrid')){
- $('botGrid').addEventListener('click',e=>{
-  const item=e.target.closest('[data-level]');
-  if(!item) return;
-  setBotLevel(item.dataset.level);
-  $('botGrid').querySelectorAll('[data-level]').forEach(el=>{
-   el.classList.remove('active');
-  });
-  item.classList.add('active');
- });
-}
-
-// Подсказка в игре
-if($('hint')){
- $('hint').onclick=()=>{
-  const moves=g.moves({verbose:true});
-  if(!moves.length){
-   say('Подсказка','В этой позиции нет доступных ходов.');
-   return;
-  }
-  const m=moves[Math.floor(Math.random()*moves.length)];
-  say('Подсказка 💡','Попробуй походить фигурой с клетки '+m.from+' на '+m.to+'.');
- };
-}
-
-// Отмена хода
-if($('undo')){
- $('undo').onclick=()=>{
   if(mode==='puz'){
-   loadPuz();
-   return;
+    puzzleClick(sq);
+    return;
   }
 
-  if(g.undo()){
-   if(mode==='play' && g.turn()!==user){
+  if(g.turn()!==user)return;
+
+  const p=pieceAt(sq);
+
+  if(sel){
+    const from=sel;
+    const legal=targets.includes(sq);
+
+    if(legal){
+      const result=g.move({from,to:sq,promotion:'q'});
+
+      if(result){
+        last=[from,sq];
+        sel=null;
+        targets=[];
+        draw();
+        status();
+
+        if(!g.game_over()&&g.turn()!==user){
+          botMove();
+        }
+        return;
+      }
+    }
+
+    if(p&&p.color===user){
+      selectPiece(sq);
+    }else{
+      sel=null;
+      targets=[];
+      draw();
+    }
+
+    return;
+  }
+
+  if(p&&p.color===user){
+    selectPiece(sq);
+  }
+}
+
+function selectPiece(sq){
+  sel=sq;
+  targets=g.moves({square:sq,verbose:true}).map(m=>m.to);
+  draw();
+}
+
+function puzzleClick(sq){
+  if(puzzleDone)return;
+
+  const p=pieceAt(sq);
+
+  if(sel){
+    if(targets.includes(sq)){
+      const from=sel;
+      const task=PUZ[puzzleIndex];
+
+      if(from===task.from&&sq===task.to){
+        const result=g.move({
+          from:from,
+          to:sq,
+          promotion:'q'
+        });
+
+        if(result){
+          puzzleDone=true;
+          puzzleSolved++;
+          puzzleStreak++;
+
+          last=[from,sq];
+          sel=null;
+          targets=[];
+
+          draw();
+          status();
+
+          $('pcount').textContent=puzzleSolved;
+          $('pstreak').textContent=puzzleStreak;
+
+          showCoach('Правильно! ✓',task.ex);
+        }
+      }else{
+        puzzleStreak=0;
+        $('pstreak').textContent=puzzleStreak;
+        showCoach('Попробуй ещё раз','Это не тот ход. Посмотри на подсказку.');
+      }
+
+      sel=null;
+      targets=[];
+      draw();
+      return;
+    }
+  }
+
+  if(p&&p.color===g.turn()){
+    selectPiece(sq);
+  }else{
+    sel=null;
+    targets=[];
+    draw();
+  }
+}
+
+function loadPuzzle(){
+  const task=PUZ[puzzleIndex];
+
+  g=new Chess(task.f);
+  mode='puz';
+  flip=g.turn()==='b';
+  sel=null;
+  targets=[];
+  last=null;
+  puzzleDone=false;
+
+  $('pt').textContent=task.t;
+  $('pcount').textContent=puzzleSolved;
+  $('pstreak').textContent=puzzleStreak;
+
+  showCoach('Задача '+(puzzleIndex+1)+'/50',task.h);
+
+  draw();
+  status();
+}
+
+function nextPuzzle(){
+  puzzleIndex++;
+
+  if(puzzleIndex>=PUZ.length){
+    puzzleIndex=0;
+    showCoach('Тренировка завершена','Вы прошли все 50 заданий. Можно начать заново.');
+  }
+
+  loadPuzzle();
+}
+
+function previousPuzzle(){
+  puzzleIndex=Math.max(0,puzzleIndex-1);
+  loadPuzzle();
+}
+
+function giveHint(){
+  const task=PUZ[puzzleIndex];
+  showCoach('Подсказка',task.h);
+}
+
+function undoMove(){
+  if(mode!=='play')return;
+
+  g.undo();
+  g.undo();
+
+  sel=null;
+  targets=[];
+  last=null;
+  busy=false;
+
+  draw();
+  status();
+}
+
+function setMode(nextMode){
+  mode=nextMode;
+  sel=null;
+  targets=[];
+  last=null;
+
+  if(nextMode==='play'){
+    $('sidePlay').hidden=false;
+    $('sidePuz').hidden=true;
+    $('trainerPanel').hidden=true;
+    $('analysisPanel').hidden=true;
+    newGame();
+  }
+
+  if(nextMode==='puz'){
+    $('sidePlay').hidden=true;
+    $('sidePuz').hidden=false;
+    $('trainerPanel').hidden=true;
+    $('analysisPanel').hidden=true;
+    puzzleIndex=0;
+    loadPuzzle();
+  }
+
+  if(nextMode==='trainer'){
+    $('sidePlay').hidden=true;
+    $('sidePuz').hidden=true;
+    $('trainerPanel').hidden=false;
+    $('analysisPanel').hidden=true;
+    showCoach('Тренер','Выберите позицию и попробуйте найти сильный ход.');
+  }
+
+  if(nextMode==='analysis'){
+    $('sidePlay').hidden=true;
+    $('sidePuz').hidden=true;
+    $('trainerPanel').hidden=true;
+    $('analysisPanel').hidden=false;
+    showCoach('Анализ','Играйте ходы и изучайте позицию.');
+  }
+}
+
+function refreshBotInfo(){
+  const level=Number($('lv').value);
+  const names={
+    1:'Новичок',
+    2:'Любитель',
+    3:'Средний',
+    4:'Сильный',
+    5:'Эксперт'
+  };
+
+  $('botinfo').textContent='Уровень бота: '+names[level];
+}
+
+$('ng').onclick=newGame;
+$('playWhite').onclick=()=>{
+  $('col').value='w';
+  newGame();
+};
+$('playBlack').onclick=()=>{
+  $('col').value='b';
+  newGame();
+};
+
+$('lv').onchange=refreshBotInfo;
+$('col').onchange=newGame;
+
+$('undo').onclick=undoMove;
+$('hint').onclick=()=>showCoach('Совет','Развивайте фигуры и контролируйте центр.');
+
+$('tp').onclick=()=>setMode('play');
+$('tz').onclick=()=>setMode('puz');
+$('tt').onclick=()=>setMode('trainer');
+$('ta').onclick=()=>setMode('analysis');
+
+$('phint').onclick=giveHint;
+$('prevp').onclick=previousPuzzle;
+$('pn').onclick=nextPuzzle;
+$('shufflep').onclick=()=>{
+  puzzleIndex=Math.floor(Math.random()*PUZ.length);
+  loadPuzzle();
+};
+
+$('analysisUndo').onclick=()=>{
+  if(g.history().length){
     g.undo();
-   }
-
-   if(historyMoves.length) historyMoves.pop();
-
-   last=null;
-   sel=null;
-   targets=[];
-   busy=false;
-   draw();
-   status();
-   updateHistory();
-   say('Ход отменён','Можно попробовать другой вариант.');
+    draw();
+    status();
   }
- };
-}
+};
 
-// Переход к задачам
-if($('pn')){
- $('pn').onclick=()=>{
-  puzzlePos=(puzzlePos+1)%PUZ.length;
-  loadPuz();
- };
-}
+$('co').onclick=()=>{
+  showCoach('Тренер','Старайтесь контролировать центр, развивать фигуры и защищать короля.');
+};
 
-if($('prevp')){
- $('prevp').onclick=()=>{
-  puzzlePos=(puzzlePos-1+PUZ.length)%PUZ.length;
-  loadPuz();
- };
-}
+$('play').onclick=()=>setMode('play');
+$('puz').onclick=()=>setMode('puz');
 
-if($('shufflep')){
- $('shufflep').onclick=randomPuzzle;
-}
-
-if($('phint')){
- $('phint').onclick=puzzleHint;
-}
-
-// Переключение разделов
-if($('tp')){
- $('tp').onclick=()=>showMode('play');
-}
-
-if($('tz')){
- $('tz').onclick=()=>{
-  showMode('puz');
-  loadPuz();
- };
-}
-
-if($('tt')){
- $('tt').onclick=()=>{
-  showMode('trainer');
-  say('Тренировка','Выбери фигуру и потренируйся находить правильные ходы.');
- };
-}
-
-if($('ta')){
- $('ta').onclick=()=>{
-  showMode('analysis');
-  say('Анализ партии','Здесь отображается история ходов текущей партии.');
- };
-}
-
-// Тренировка
-if($('co')){
- $('co').onclick=()=>{
-  const moves=g.moves({verbose:true});
-  if(!moves.length){
-   say('Тренер','В этой позиции нет доступных ходов.');
-   return;
-  }
-
-  const m=moves[Math.floor(Math.random()*moves.length)];
-  say('Совет тренера','Посмотри на ход '+m.from+' → '+m.to+'. Подумай, какие фигуры он атакует.');
- };
-}
-
-// Анализ партии
-if($('analysisUndo')){
- $('analysisUndo').onclick=()=>{
-  if(g.undo()){
-   if(historyMoves.length) historyMoves.pop();
-   last=null;
-   draw();
-   status();
-   updateHistory();
-   say('Анализ','Последний ход отменён.');
-  }
- };
-}
-
-// Первоначальная загрузка
-showMode('play');
+refreshBotInfo();
 newGame();
+
+</script>
+</body>
+</html>
