@@ -1,9 +1,11 @@
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Chess Master</title>
+
 <style>
 :root{
  --bg:#17212b;
@@ -180,7 +182,10 @@ button{font-family:inherit}
  aspect-ratio:1;
  min-width:0;
  min-height:0;
- overflow:hidden
+ overflow:hidden;
+ border:0;
+ padding:0;
+ border-radius:0;
 }
 .sq span.piece{
  display:block;
@@ -458,6 +463,7 @@ button{font-family:inherit}
 }
 </style>
 </head>
+
 <body>
 
 <header class="topbar">
@@ -654,517 +660,900 @@ button{font-family:inherit}
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+
 <script>
-const SYM={
+'use strict';
+
+/* =================================
+   СОСТОЯНИЕ И НАСТРОЙКИ
+================================= */
+
+const SYM = {
  w:{k:'♔',q:'♕',r:'♖',b:'♗',n:'♘',p:'♙'},
  b:{k:'♚',q:'♛',r:'♜',b:'♝',n:'♞',p:'♟'}
 };
 
-const VAL={p:100,n:320,b:330,r:500,q:900,k:0};
+const VAL = {
+ p:100,
+ n:320,
+ b:330,
+ r:500,
+ q:900,
+ k:20000
+};
 
-let g=new Chess();
-let mode='play';
-let sel=null;
-let targets=[];
-let last=null;
-let user='w';
-let busy=false;
-let solved=0;
-let flip=false;
+const $ = id => document.getElementById(id);
 
-const $=id=>document.getElementById(id);
- const PUZ = [
-  // 1–10: мат и тактические удары
-  {t:"Мат в 1 · задача 1",f:"7k/6pp/5K2/8/8/8/6Q1/8 w - - 0 1",from:"g2",to:"g7",h:"Попробуйте поставить ферзя рядом с королём соперника.",ex:"Ферзь поддержан королём и ограничивает поля отхода."},
-  {t:"Мат в 1 · задача 2",f:"7k/5ppp/6K1/8/8/8/5Q2/8 w - - 0 1",from:"f2",to:"f8",h:"Ищите шах по восьмой горизонтали.",ex:"Ферзь атакует короля по линии."},
-  {t:"Мат в 1 · задача 3",f:"6k1/5ppp/6K1/8/8/8/5Q2/8 w - - 0 1",from:"f2",to:"f8",h:"Проверьте возможность шаха ферзём.",ex:"Ферзь создаёт решающую угрозу."},
-  {t:"Мат в 1 · задача 4",f:"7k/6pp/5K2/8/8/8/5R2/8 w - - 0 1",from:"f2",to:"f8",h:"Посмотрите на восьмую горизонталь.",ex:"Ладья ограничивает короля."},
-  {t:"Мат в 1 · задача 5",f:"7k/6pp/5K2/8/8/8/5R2/8 w - - 0 1",from:"f2",to:"h2",h:"Попробуйте найти шах по второй горизонтали.",ex:"Ладья атакует короля сбоку."},
+let g = new Chess();
+let mode = 'play';
+let sel = null;
+let targets = [];
+let last = null;
+let user = 'w';
+let busy = false;
+let flip = false;
 
-  // 6–15: вилки
-  {t:"Вилка · задача 6",f:"4k3/8/8/3q1r2/8/2N5/8/4K3 w - - 0 1",from:"c3",to:"d5",h:"Конь может атаковать сразу несколько фигур.",ex:"Конь создаёт двойную угрозу."},
-  {t:"Вилка · задача 7",f:"4k3/8/8/8/2q1r3/8/3N4/4K3 w - - 0 1",from:"d2",to:"f3",h:"Найдите ход конём с двойной атакой.",ex:"Конь нападает на важные фигуры."},
-  {t:"Вилка · задача 8",f:"4k3/8/8/3q4/8/2N5/8/4K3 w - - 0 1",from:"c3",to:"d5",h:"Ищите поле, с которого конь атакует ферзя.",ex:"Конь нападает на ферзя."},
-  {t:"Вилка · задача 9",f:"4k3/8/8/8/3r4/8/2N5/4K3 w - - 0 1",from:"c2",to:"d4",h:"Попробуйте создать двойную угрозу.",ex:"Конь атакует ладью."},
-  {t:"Вилка · задача 10",f:"4k3/8/8/3q4/8/8/2N5/4K3 w - - 0 1",from:"c2",to:"d4",h:"Найдите атакующий ход конём.",ex:"Конь нападает на ферзя."},
+let puzzleIndex = 0;
+let puzzleSolved = 0;
+let puzzleStreak = 0;
+let puzzleDone = false;
+let puzzleOrder = [];
 
-  // 11–20: связки и двойные атаки
-  {t:"Связка · задача 11",f:"4k3/5n2/8/8/8/8/8/2B1K3 w - - 0 1",from:"c1",to:"g5",h:"Попробуйте связать коня с королём.",ex:"Слон создаёт связку по диагонали."},
-  {t:"Связка · задача 12",f:"4k3/8/5n2/8/8/8/8/2B1K3 w - - 0 1",from:"c1",to:"g5",h:"Ищите диагональ к королю.",ex:"Слон связывает коня."},
-  {t:"Связка · задача 13",f:"4k3/8/8/5n2/8/8/8/2B1K3 w - - 0 1",from:"c1",to:"g5",h:"Подумайте о диагональной атаке.",ex:"Слон давит на фигуру."},
-  {t:"Двойная атака · задача 14",f:"4k3/8/8/8/8/8/3q4/2R1K3 w - - 0 1",from:"c1",to:"c8",h:"Найдите активный ход ладьёй.",ex:"Ладья занимает открытую линию."},
-  {t:"Двойная атака · задача 15",f:"4k3/8/8/8/8/8/3q4/2R1K3 w - - 0 1",from:"c1",to:"c8",h:"Используйте открытую вертикаль.",ex:"Ладья усиливает давление."},
+let botLevel = 2;
 
-  // 16–25: пешки и превращение
-  {t:"Превращение · задача 16",f:"4k3/P7/8/8/8/8/8/4K3 w - - 0 1",from:"a7",to:"a8",h:"Пешка почти дошла до последней горизонтали.",ex:"Пешка превращается в новую фигуру."},
-  {t:"Превращение · задача 17",f:"4k3/1P6/8/8/8/8/8/4K3 w - - 0 1",from:"b7",to:"b8",h:"Продвиньте пешку на последнюю горизонталь.",ex:"Пешка получает возможность превратиться."},
-  {t:"Превращение · задача 18",f:"4k3/2P5/8/8/8/8/8/4K3 w - - 0 1",from:"c7",to:"c8",h:"Найдите путь к превращению.",ex:"Пешка достигает последней горизонтали."},
-  {t:"Превращение · задача 19",f:"4k3/3P4/8/8/8/8/8/4K3 w - - 0 1",from:"d7",to:"d8",h:"Пешка может стать ферзём.",ex:"Превращение усиливает позицию."},
-  {t:"Превращение · задача 20",f:"4k3/4P3/8/8/8/8/8/4K3 w - - 0 1",from:"e7",to:"e8",h:"Используйте возможность превращения.",ex:"Пешка превращается в выбранную фигуру."},
+const PUZ = [];
 
-  // 21–30: атаки и выигрыш материала
-  {t:"Атака · задача 21",f:"4k3/8/8/8/8/8/4q3/3RK3 w - - 0 1",from:"d1",to:"d8",h:"Активизируйте ладью.",ex:"Ладья занимает открытую вертикаль."},
-  {t:"Атака · задача 22",f:"4k3/8/8/8/8/8/4q3/3RK3 w - - 0 1",from:"d1",to:"d8",h:"Найдите сильный ход ладьёй.",ex:"Ладья вторгается на последнюю горизонталь."},
-  {t:"Атака · задача 23",f:"4k3/8/8/8/8/8/4q3/3RK3 w - - 0 1",from:"d1",to:"d8",h:"Посмотрите на открытую линию.",ex:"Ладья получает активную позицию."},
-  {t:"Атака · задача 24",f:"4k3/8/8/8/8/8/4q3/3RK3 w - - 0 1",from:"d1",to:"d8",h:"Попробуйте проникнуть в лагерь соперника.",ex:"Ладья занимает сильное поле."},
-  {t:"Атака · задача 25",f:"4k3/8/8/8/8/8/4q3/3RK3 w - - 0 1",from:"d1",to:"d8",h:"Ищите активный ход.",ex:"Ладья усиливает давление."},
+/* =================================
+   ОЦЕНКА ПОЗИЦИИ
+================================= */
 
-  // 26–35: защита и позиционная игра
-  {t:"Защита · задача 26",f:"4k3/8/8/8/8/8/4r3/3RK3 w - - 0 1",from:"d1",to:"e1",h:"Подумайте, как защитить короля.",ex:"Ладья меняет расположение для защиты."},
-  {t:"Защита · задача 27",f:"4k3/8/8/8/8/8/4r3/3RK3 w - - 0 1",from:"d1",to:"e1",h:"Попробуйте укрепить позицию.",ex:"Защитный ход ладьёй."},
-  {t:"Защита · задача 28",f:"4k3/8/8/8/8/8/4r3/3RK3 w - - 0 1",from:"d1",to:"e1",h:"Найдите способ улучшить защиту.",ex:"Ладья становится ближе к королю."},
-  {t:"Защита · задача 29",f:"4k3/8/8/8/8/8/4r3/3RK3 w - - 0 1",from:"d1",to:"e1",h:"Защитите важное поле.",ex:"Ладья занимает защитную позицию."},
-  {t:"Защита · задача 30",f:"4k3/8/8/8/8/8/4r3/3RK3 w - - 0 1",from:"d1",to:"e1",h:"Подумайте о безопасности короля.",ex:"Защитный манёвр ладьёй."},
+function materialScore(game,color) {
+ let score = 0;
 
-  // 31–40: разные тактические идеи
-  {t:"Тактика · задача 31",f:"4k3/8/8/8/8/8/3q4/2R1K3 w - - 0 1",from:"c1",to:"c8",h:"Ищите активность на открытой линии.",ex:"Ладья занимает восьмую горизонталь."},
-  {t:"Тактика · задача 32",f:"4k3/8/8/8/8/8/3q4/2R1K3 w - - 0 1",from:"c1",to:"c8",h:"Усильте давление ладьёй.",ex:"Ладья выходит на активную позицию."},
-  {t:"Тактика · задача 33",f:"4k3/8/8/8/8/8/3q4/2R1K3 w - - 0 1",from:"c1",to:"c8",h:"Найдите ход по открытой линии.",ex:"Ладья активизируется."},
-  {t:"Тактика · задача 34",f:"4k3/8/8/8/8/8/3q4/2R1K3 w - - 0 1",from:"c1",to:"c8",h:"Используйте положение фигур.",ex:"Ладья занимает сильную линию."},
-  {t:"Тактика · задача 35",f:"4k3/8/8/8/8/8/3q4/2R1K3 w - - 0 1",from:"c1",to:"c8",h:"Найдите активный манёвр.",ex:"Ладья усиливает атаку."},
+ game.board().forEach(row => {
+  row.forEach(piece => {
+   if (!piece) return;
 
-  // 41–50: заключительные задания
-  {t:"Финальная задача 41",f:"4k3/8/8/8/8/8/3q4/2R1K3 w - - 0 1",from:"c1",to:"c8",h:"Поищите сильный ход ладьёй.",ex:"Ладья занимает открытую линию."},
-  {t:"Финальная задача 42",f:"4k3/8/8/8/8/8/3q4/2R1K3 w - - 0 1",from:"c1",to:"c8",h:"Подумайте о контроле линий.",ex:"Ладья получает пространство."},
-  {t:"Финальная задача 43",f:"4k3/8/8/8/8/8/3q4/2R1K3 w - - 0 1",from:"c1",to:"c8",h:"Используйте ладью активно.",ex:"Ладья усиливает давление."},
-  {t:"Финальная задача 44",f:"4k3/8/8/8/8/8/3q4/2R1K3 w - - 0 1",from:"c1",to:"c8",h:"Ищите ход на открытую вертикаль.",ex:"Ладья занимает активное поле."},
-  {t:"Финальная задача 45",f:"4k3/8/8/8/8/8/3q4/2R1K3 w - - 0 1",from:"c1",to:"c8",h:"Найдите лучший манёвр.",ex:"Ладья вторгается на сильную линию."},
-  {t:"Финальная задача 46",f:"4k3/8/8/8/8/8/3q4/2R1K3 w - - 0 1",from:"c1",to:"c8",h:"Посмотрите на открытые линии.",ex:"Ладья получает активную позицию."},
-  {t:"Финальная задача 47",f:"4k3/8/8/8/8/8/3q4/2R1K3 w - - 0 1",from:"c1",to:"c8",h:"Ищите тактическую возможность.",ex:"Ладья создаёт давление."},
-  {t:"Финальная задача 48",f:"4k3/8/8/8/8/8/3q4/2R1K3 w - - 0 1",from:"c1",to:"c8",h:"Найдите сильный ход.",ex:"Ладья активизируется."},
-  {t:"Финальная задача 49",f:"4k3/8/8/8/8/8/3q4/2R1K3 w - - 0 1",from:"c1",to:"c8",h:"Используйте ладью для атаки.",ex:"Ладья занимает открытую линию."},
-  {t:"Финальная задача 50",f:"4k3/8/8/8/8/8/3q4/2R1K3 w - - 0 1",from:"c1",to:"c8",h:"Завершите тренировку сильным ходом.",ex:"Ладья занимает активную позицию."}
-];
+   const value = VAL[piece.type];
 
-let puzzleIndex=0;
-let puzzleSolved=0;
-let puzzleStreak=0;
-let puzzleDone=false;
-
-function squareName(file,rank){
-  return String.fromCharCode(97+file)+rank;
-}
-
-function pieceAt(square){
-  const file=square.charCodeAt(0)-97;
-  const rank=Number(square[1]);
-  const board=g.board();
-  return board[8-rank][file];
-}
-
-function draw(){
-  const board=$('board');
-  if(!board)return;
-  board.innerHTML='';
-  const files=flip?[7,6,5,4,3,2,1,0]:[0,1,2,3,4,5,6,7];
-  const ranks=flip?[1,2,3,4,5,6,7,8]:[8,7,6,5,4,3,2,1];
-
-  ranks.forEach((rank,ri)=>{
-    files.forEach((file,fi)=>{
-      const sq=squareName(file,rank);
-      const p=pieceAt(sq);
-      const el=document.createElement('button');
-      el.type='button';
-      el.className='square '+(((file+rank)%2===0)?'dark':'light');
-      el.dataset.square=sq;
-      if(last&&last.includes(sq))el.classList.add('last');
-      if(sel===sq)el.classList.add('selected');
-      if(targets.includes(sq))el.classList.add('target');
-      if(p){
-        const piece=document.createElement('span');
-        piece.className='piece '+p.color;
-        piece.textContent=SYM[p.color][p.type];
-        el.appendChild(piece);
-      }
-      if(fi===0){
-        const coord=document.createElement('small');
-        coord.className='rank-label';
-        coord.textContent=rank;
-        el.appendChild(coord);
-      }
-      if(ri===7){
-        const coord=document.createElement('small');
-        coord.className='file-label';
-        coord.textContent=String.fromCharCode(97+file);
-        el.appendChild(coord);
-      }
-      el.addEventListener('click',()=>onSquare(sq));
-      board.appendChild(el);
-    });
+   score += piece.color===color ? value : -value;
   });
-  $('stat').textContent='Ход: '+(g.turn()==='w'?'белых':'чёрных');
-  $('hist').textContent=g.history().length?g.history().join('  '):'Пока нет ходов';
+ });
+
+ return score;
 }
 
-function status(){
-  let s='';
-  if(g.in_checkmate())s='Мат! Победа '+(g.turn()==='w'?'чёрных':'белых');
-  else if(g.in_draw())s='Ничья';
-  else if(g.in_check())s='Шах!';
-  else s='Позиция готова';
-  $('stat').textContent=s;
+function evaluateMove(game,move,mover) {
+ let score = materialScore(game,mover);
+
+ if (game.in_checkmate()) score += 100000;
+ else if (game.in_check()) score += 35;
+
+ if (move.captured) score += VAL[move.captured]*0.65;
+
+ if (move.promotion) score += VAL[move.promotion];
+
+ return score;
 }
 
-function showCoach(title,message){
-  $('coach').innerHTML='<strong>'+title+'</strong><br>'+message;
-}
- function evaluateBoard(){
-  let score=0;
-  const board=g.board();
+/* =================================
+   ГЕНЕРАЦИЯ 50 РАЗНЫХ ПОЗИЦИЙ
+================================= */
 
-  board.forEach(row=>{
-    row.forEach(p=>{
-      if(!p)return;
-      const value=VAL[p.type];
-      score+=(p.color==='w'?value:-value);
-    });
+function generatePuzzles() {
+ PUZ.length = 0;
+
+ const used = new Set();
+
+ const titles = [
+  'Тактический поиск',
+  'Найди активный ход',
+  'Материальная выгода',
+  'Безопасность короля',
+  'Комбинационная идея',
+  'Развитие фигур',
+  'Атака на короля',
+  'Защита позиции',
+  'Выигрыш материала',
+  'Шахматная стратегия'
+ ];
+
+ const hints = [
+  'Проверь шахи, взятия и угрозы. Обрати внимание на положение фигур.',
+  'Посмотри, какие фигуры можно активизировать.',
+  'Проверь, можно ли выиграть фигуру или пешку.',
+  'Сначала оцени безопасность короля.',
+  'Посмотри, как фигуры могут действовать совместно.',
+  'Подумай, какая фигура сейчас стоит неактивно.',
+  'Проверь, можно ли усилить давление на короля.',
+  'Учитывай угрозы соперника и безопасность своих фигур.',
+  'Посмотри на возможные взятия и тактические возможности.',
+  'Найди ход, который улучшает положение твоих фигур.'
+ ];
+
+ const explanations = [
+  'Положение фигур изменилось в пользу вашей стороны.',
+  'Этот ход улучшает активность фигур.',
+  'Важно учитывать материальный баланс.',
+  'Безопасность короля — одна из главных задач.',
+  'Сильные ходы используют взаимодействие фигур.',
+  'Развитие фигур помогает контролировать доску.',
+  'Активные фигуры создают больше угроз.',
+  'Хорошая защита помогает сохранить преимущество.',
+  'Материальный баланс может измениться после тактического хода.',
+  'Позиционная игра требует внимательности.'
+ ];
+
+ let attempts = 0;
+
+ while (PUZ.length < 50 && attempts < 10000) {
+  attempts++;
+
+  const game = new Chess();
+
+  const plies = 10 + Math.floor(Math.random()*35);
+
+  for (let i=0;i<plies;i++) {
+   const moves = game.moves({verbose:true});
+
+   if (!moves.length) break;
+
+   const move = moves[Math.floor(Math.random()*moves.length)];
+
+   game.move(move);
+
+   if (game.game_over()) break;
+  }
+
+  if (game.game_over()) continue;
+
+  const fen = game.fen();
+
+  if (used.has(fen)) continue;
+
+  used.add(fen);
+
+  const legalMoves = game.moves({verbose:true});
+
+  if (!legalMoves.length) continue;
+
+  const mover = game.turn();
+
+  const scored = legalMoves.map(move => {
+   game.move(move);
+
+   const score = evaluateMove(game,move,mover);
+
+   game.undo();
+
+   return {move,score};
   });
 
-  return score;
-}
+  scored.sort((a,b)=>b.score-a.score);
 
-function chooseBotMove(){
-  const moves=g.moves({verbose:true});
-  if(!moves.length)return null;
+  const best = scored[0];
 
-  const level=Number($('lv').value);
-  let scored=moves.map(m=>{
-    g.move(m);
-    let score=evaluateBoard();
+  const number = PUZ.length;
 
-    if(g.in_checkmate()){
-      score+=g.turn()==='w'?-100000:100000;
-    }else if(g.in_check()){
-      score+=g.turn()==='w'?-25:25;
-    }
-
-    g.undo();
-
-    if(m.captured){
-      score+=(m.color==='w'?1:-1)*VAL[m.captured]*0.8;
-    }
-
-    return {move:m,score};
+  PUZ.push({
+   f:fen,
+   t:titles[number%titles.length]+' · задача '+(number+1),
+   h:hints[number%hints.length],
+   ex:explanations[number%explanations.length],
+   from:best.move.from,
+   to:best.move.to,
+   promotion:best.move.promotion || 'q'
   });
+ }
 
-  if(level===1){
-    return moves[Math.floor(Math.random()*moves.length)];
-  }
-
-  scored.sort((a,b)=>g.turn()==='w'?b.score-a.score:a.score-b.score);
-
-  const randomness=level===2?0.65:level===3?0.35:level===4?0.12:0.03;
-  const top=Math.max(1,Math.ceil(scored.length*randomness));
-
-  return scored[Math.floor(Math.random()*top)].move;
+ puzzleOrder = PUZ.map((_,i)=>i);
 }
 
-function botMove(){
-  if(g.game_over())return;
-  busy=true;
+/* =================================
+   РАБОТА С ДОСКОЙ
+================================= */
 
-  setTimeout(()=>{
-    const m=chooseBotMove();
-
-    if(m){
-      g.move(m);
-      last=[m.from,m.to];
-    }
-
-    busy=false;
-    draw();
-    status();
-  },350);
+function squareName(file,rank) {
+ return String.fromCharCode(97+file)+rank;
 }
 
-function newGame(){
-  g=new Chess();
-  mode='play';
-  sel=null;
-  targets=[];
-  last=null;
-  busy=false;
-  flip=$('col').value==='b';
-  user=$('col').value;
+function pieceAt(square) {
+ const file = square.charCodeAt(0)-97;
+ const rank = Number(square[1]);
 
-  showCoach('Новая партия','Игра началась. Сделайте первый ход.');
-
-  draw();
-  status();
-
-  if(user==='b'){
-    botMove();
-  }
+ return g.board()[8-rank][file];
 }
 
-function onSquare(sq){
-  if(busy||g.game_over())return;
+function draw() {
+ const board = $('board');
 
-  if(mode==='puz'){
-    puzzleClick(sq);
-    return;
-  }
+ if (!board) return;
 
-  if(g.turn()!==user)return;
+ board.innerHTML = '';
 
-  const p=pieceAt(sq);
+ const files = flip
+  ? [7,6,5,4,3,2,1,0]
+  : [0,1,2,3,4,5,6,7];
 
-  if(sel){
-    const from=sel;
-    const legal=targets.includes(sq);
+ const ranks = flip
+  ? [1,2,3,4,5,6,7,8]
+  : [8,7,6,5,4,3,2,1];
 
-    if(legal){
-      const result=g.move({from,to:sq,promotion:'q'});
+ const currentBoard = g.board();
 
-      if(result){
-        last=[from,sq];
-        sel=null;
-        targets=[];
-        draw();
-        status();
+ const checkedKing = g.in_check()
+  ? g.turn()
+  : null;
 
-        if(!g.game_over()&&g.turn()!==user){
-          botMove();
-        }
-        return;
-      }
-    }
+ ranks.forEach((rank,ri) => {
+  files.forEach((file,fi) => {
+   const square = squareName(file,rank);
+   const piece = currentBoard[8-rank][file];
 
-    if(p&&p.color===user){
-      selectPiece(sq);
-    }else{
-      sel=null;
-      targets=[];
-      draw();
-    }
+   const el = document.createElement('button');
 
-    return;
-  }
+   el.type = 'button';
+   el.className = 'sq '+(((file+rank)%2===0)?'d':'l');
 
-  if(p&&p.color===user){
-    selectPiece(sq);
-  }
+   el.dataset.square = square;
+
+   if (last && last.includes(square)) {
+    el.classList.add('last');
+   }
+
+   if (sel===square) {
+    el.classList.add('sel');
+   }
+
+   if (targets.includes(square)) {
+    el.classList.add('tg');
+   }
+
+   if (piece && piece.type==='k' && piece.color===checkedKing) {
+    el.classList.add('chk');
+   }
+
+   if (piece) {
+    const pieceElement = document.createElement('span');
+
+    pieceElement.className = 'piece '+piece.color;
+    pieceElement.textContent = SYM[piece.color][piece.type];
+
+    el.appendChild(pieceElement);
+   }
+
+   if (fi===0) {
+    const coordinate = document.createElement('small');
+
+    coordinate.className = 'coord rank';
+    coordinate.textContent = rank;
+
+    el.appendChild(coordinate);
+   }
+
+   if (ri===7) {
+    const coordinate = document.createElement('small');
+
+    coordinate.className = 'coord file';
+    coordinate.textContent = String.fromCharCode(97+file);
+
+    el.appendChild(coordinate);
+   }
+
+   el.addEventListener('click',()=>onSquare(square));
+
+   board.appendChild(el);
+  });
+ });
+
+ $('stat').textContent =
+  'Ход: '+(g.turn()==='w'?'белых':'чёрных');
+
+ $('hist').textContent =
+  g.history().length
+   ? g.history().join('  ')
+   : 'Пока нет ходов';
+
+ $('analysisHistory').textContent =
+  g.history().length
+   ? g.history().join('  ')
+   : 'История партии пока пуста';
 }
 
-function selectPiece(sq){
-  sel=sq;
-  targets=g.moves({square:sq,verbose:true}).map(m=>m.to);
-  draw();
+function status() {
+ let message = '';
+
+ if (g.in_checkmate()) {
+  message = 'Мат! Победа '+(g.turn()==='w'?'чёрных':'белых');
+ } else if (g.in_draw()) {
+  message = 'Ничья';
+ } else if (g.in_check()) {
+  message = 'Шах!';
+ } else {
+  message = 'Позиция готова';
+ }
+
+ $('stat').textContent = message;
 }
 
-function puzzleClick(sq){
-  if(puzzleDone)return;
+function showCoach(title,message) {
+ const coach = $('coach');
 
-  const p=pieceAt(sq);
+ coach.innerHTML = '';
 
-  if(sel){
-    if(targets.includes(sq)){
-      const from=sel;
-      const task=PUZ[puzzleIndex];
+ const heading = document.createElement('b');
+ heading.textContent = title;
 
-      if(from===task.from&&sq===task.to){
-        const result=g.move({
-          from:from,
-          to:sq,
-          promotion:'q'
-        });
+ const text = document.createElement('span');
+ text.textContent = message;
 
-        if(result){
-          puzzleDone=true;
-          puzzleSolved++;
-          puzzleStreak++;
-
-          last=[from,sq];
-          sel=null;
-          targets=[];
-
-          draw();
-          status();
-
-          $('pcount').textContent=puzzleSolved;
-          $('pstreak').textContent=puzzleStreak;
-
-          showCoach('Правильно! ✓',task.ex);
-        }
-      }else{
-        puzzleStreak=0;
-        $('pstreak').textContent=puzzleStreak;
-        showCoach('Попробуй ещё раз','Это не тот ход. Посмотри на подсказку.');
-      }
-
-      sel=null;
-      targets=[];
-      draw();
-      return;
-    }
-  }
-
-  if(p&&p.color===g.turn()){
-    selectPiece(sq);
-  }else{
-    sel=null;
-    targets=[];
-    draw();
-  }
+ coach.appendChild(heading);
+ coach.appendChild(text);
 }
 
-function loadPuzzle(){
-  const task=PUZ[puzzleIndex];
+/* =================================
+   ВЫБОР ХОДА БОТОМ
+================================= */
 
-  g=new Chess(task.f);
-  mode='puz';
-  flip=g.turn()==='b';
-  sel=null;
-  targets=[];
-  last=null;
-  puzzleDone=false;
+function chooseBotMove() {
+ const moves = g.moves({verbose:true});
 
-  $('pt').textContent=task.t;
-  $('pcount').textContent=puzzleSolved;
-  $('pstreak').textContent=puzzleStreak;
+ if (!moves.length) return null;
 
-  showCoach('Задача '+(puzzleIndex+1)+'/50',task.h);
+ const level = Number($('lv').value);
+ const mover = g.turn();
 
-  draw();
-  status();
-}
+ if (level===1) {
+  return moves[Math.floor(Math.random()*moves.length)];
+ }
 
-function nextPuzzle(){
-  puzzleIndex++;
+ const scored = moves.map(move => {
+  g.move(move);
 
-  if(puzzleIndex>=PUZ.length){
-    puzzleIndex=0;
-    showCoach('Тренировка завершена','Вы прошли все 50 заданий. Можно начать заново.');
-  }
-
-  loadPuzzle();
-}
-
-function previousPuzzle(){
-  puzzleIndex=Math.max(0,puzzleIndex-1);
-  loadPuzzle();
-}
-
-function giveHint(){
-  const task=PUZ[puzzleIndex];
-  showCoach('Подсказка',task.h);
-}
-
-function undoMove(){
-  if(mode!=='play')return;
+  let score = evaluateMove(g,move,mover);
 
   g.undo();
-  g.undo();
 
-  sel=null;
-  targets=[];
-  last=null;
-  busy=false;
+  return {move,score};
+ });
+
+ scored.sort((a,b)=>b.score-a.score);
+
+ const randomness = {
+  2:0.65,
+  3:0.35,
+  4:0.15,
+  5:0.05
+ }[level] || 0.05;
+
+ const count = Math.max(
+  1,
+  Math.ceil(scored.length*randomness)
+ );
+
+ return scored[Math.floor(Math.random()*count)].move;
+}
+
+function botMove() {
+ if (g.game_over()) return;
+
+ busy = true;
+
+ setTimeout(() => {
+  if (g.game_over()) {
+   busy = false;
+   return;
+  }
+
+  const move = chooseBotMove();
+
+  if (move) {
+   g.move(move);
+   last = [move.from,move.to];
+  }
+
+  busy = false;
 
   draw();
   status();
+
+  if (g.game_over()) {
+   showCoach('Партия окончена','Партия завершена. Можно начать новую игру.');
+  }
+ },350);
 }
 
-function setMode(nextMode){
-  mode=nextMode;
-  sel=null;
-  targets=[];
-  last=null;
+/* =================================
+   НОВАЯ ИГРА
+================================= */
 
-  if(nextMode==='play'){
-    $('sidePlay').hidden=false;
-    $('sidePuz').hidden=true;
-    $('trainerPanel').hidden=true;
-    $('analysisPanel').hidden=true;
-    newGame();
-  }
+function newGame() {
+ g = new Chess();
 
-  if(nextMode==='puz'){
-    $('sidePlay').hidden=true;
-    $('sidePuz').hidden=false;
-    $('trainerPanel').hidden=true;
-    $('analysisPanel').hidden=true;
-    puzzleIndex=0;
-    loadPuzzle();
-  }
+ mode = 'play';
+ sel = null;
+ targets = [];
+ last = null;
+ busy = false;
 
-  if(nextMode==='trainer'){
-    $('sidePlay').hidden=true;
-    $('sidePuz').hidden=true;
-    $('trainerPanel').hidden=false;
-    $('analysisPanel').hidden=true;
-    showCoach('Тренер','Выберите позицию и попробуйте найти сильный ход.');
-  }
+ user = $('col').value;
+ flip = user==='b';
 
-  if(nextMode==='analysis'){
-    $('sidePlay').hidden=true;
-    $('sidePuz').hidden=true;
-    $('trainerPanel').hidden=true;
-    $('analysisPanel').hidden=false;
-    showCoach('Анализ','Играйте ходы и изучайте позицию.');
-  }
+ $('playWhite').classList.toggle('selected',user==='w');
+ $('playBlack').classList.toggle('selected',user==='b');
+
+ $('boardTitle').textContent = 'Игра против бота';
+
+ showCoach('Новая партия','Игра началась. Сделайте первый ход.');
+
+ draw();
+ status();
+
+ if (user==='b') {
+  botMove();
+ }
 }
 
-function refreshBotInfo(){
-  const level=Number($('lv').value);
-  const names={
-    1:'Новичок',
-    2:'Любитель',
-    3:'Средний',
-    4:'Сильный',
-    5:'Эксперт'
-  };
+/* =================================
+   ВЫБОР ФИГУРЫ И ХОДЫ
+================================= */
 
-  $('botinfo').textContent='Уровень бота: '+names[level];
+function selectPiece(square) {
+ sel = square;
+
+ targets = g.moves({
+  square:square,
+  verbose:true
+ }).map(move=>move.to);
+
+ draw();
 }
 
-$('ng').onclick=newGame;
-$('playWhite').onclick=()=>{
-  $('col').value='w';
-  newGame();
-};
-$('playBlack').onclick=()=>{
-  $('col').value='b';
-  newGame();
-};
+function onSquare(square) {
+ if (busy || g.game_over()) return;
 
-$('lv').onchange=refreshBotInfo;
-$('col').onchange=newGame;
+ if (mode==='puz') {
+  puzzleClick(square);
+  return;
+ }
 
-$('undo').onclick=undoMove;
-$('hint').onclick=()=>showCoach('Совет','Развивайте фигуры и контролируйте центр.');
+ if (g.turn()!==user) return;
 
-$('tp').onclick=()=>setMode('play');
-$('tz').onclick=()=>setMode('puz');
-$('tt').onclick=()=>setMode('trainer');
-$('ta').onclick=()=>setMode('analysis');
+ const piece = pieceAt(square);
 
-$('phint').onclick=giveHint;
-$('prevp').onclick=previousPuzzle;
-$('pn').onclick=nextPuzzle;
-$('shufflep').onclick=()=>{
-  puzzleIndex=Math.floor(Math.random()*PUZ.length);
-  loadPuzzle();
-};
+ if (sel) {
+  const from = sel;
 
-$('analysisUndo').onclick=()=>{
-  if(g.history().length){
-    g.undo();
+  if (targets.includes(square)) {
+   const result = g.move({
+    from:from,
+    to:square,
+    promotion:'q'
+   });
+
+   if (result) {
+    last = [from,square];
+
+    sel = null;
+    targets = [];
+
     draw();
     status();
+
+    if (!g.game_over() && g.turn()!==user) {
+     botMove();
+    }
+
+    return;
+   }
   }
+
+  if (piece && piece.color===user) {
+   selectPiece(square);
+  } else {
+   sel = null;
+   targets = [];
+   draw();
+  }
+
+  return;
+ }
+
+ if (piece && piece.color===user) {
+  selectPiece(square);
+ }
+}
+
+/* =================================
+   ШАХМАТНЫЕ ЗАДАЧИ
+================================= */
+
+function loadPuzzle() {
+ const task = PUZ[puzzleOrder[puzzleIndex]];
+
+ if (!task) {
+  showCoach('Ошибка','Не удалось загрузить задачу.');
+  return;
+ }
+
+ g = new Chess(task.f);
+
+ mode = 'puz';
+ flip = g.turn()==='b';
+
+ sel = null;
+ targets = [];
+ last = null;
+ busy = false;
+ puzzleDone = false;
+
+ $('boardTitle').textContent = 'Шахматная задача';
+
+ $('pt').textContent =
+  task.t+' · '+(puzzleIndex+1)+'/'+PUZ.length;
+
+ $('pcount').textContent = 'Решено: '+puzzleSolved;
+ $('pstreak').textContent = 'Серия: '+puzzleStreak;
+
+ showCoach('Задача '+(puzzleIndex+1),task.h);
+
+ draw();
+ status();
+}
+
+function puzzleClick(square) {
+ if (puzzleDone) return;
+
+ const piece = pieceAt(square);
+
+ if (sel) {
+  const from = sel;
+
+  if (targets.includes(square)) {
+   const task = PUZ[puzzleOrder[puzzleIndex]];
+
+   if (from===task.from && square===task.to) {
+    const result = g.move({
+     from:from,
+     to:square,
+     promotion:task.promotion || 'q'
+    });
+
+    if (result) {
+     puzzleDone = true;
+
+     puzzleSolved++;
+     puzzleStreak++;
+
+     last = [from,square];
+
+     sel = null;
+     targets = [];
+
+     draw();
+     status();
+
+     $('pcount').textContent = 'Решено: '+puzzleSolved;
+     $('pstreak').textContent = 'Серия: '+puzzleStreak;
+
+     showCoach('Правильно! ✓',task.ex);
+
+     return;
+    }
+   }
+
+   puzzleStreak = 0;
+
+   $('pstreak').textContent = 'Серия: 0';
+
+   showCoach(
+    'Не совсем!',
+    'Это не тот ход. Попробуйте ещё раз или воспользуйтесь подсказкой.'
+   );
+
+   sel = null;
+   targets = [];
+
+   draw();
+
+   return;
+  }
+ }
+
+ if (piece && piece.color===g.turn()) {
+  selectPiece(square);
+ } else {
+  sel = null;
+  targets = [];
+  draw();
+ }
+}
+
+function nextPuzzle() {
+ puzzleIndex++;
+
+ if (puzzleIndex>=PUZ.length) {
+  puzzleIndex = 0;
+
+  showCoach(
+   'Тренировка завершена',
+   'Вы прошли все 50 заданий. Можно начать заново.'
+  );
+ }
+
+ loadPuzzle();
+}
+
+function previousPuzzle() {
+ puzzleIndex = Math.max(0,puzzleIndex-1);
+ loadPuzzle();
+}
+
+function giveHint() {
+ const task = PUZ[puzzleOrder[puzzleIndex]];
+
+ showCoach('Подсказка 💡',task.h);
+}
+
+function shufflePuzzles() {
+ for (let i=puzzleOrder.length-1;i>0;i--) {
+  const j=Math.floor(Math.random()*(i+1));
+
+  [puzzleOrder[i],puzzleOrder[j]] =
+   [puzzleOrder[j],puzzleOrder[i]];
+ }
+
+ puzzleIndex = 0;
+
+ loadPuzzle();
+}
+
+/* =================================
+   ОТМЕНА ХОДА
+================================= */
+
+function undoMove() {
+ if (mode==='puz') return;
+
+ if (g.history().length) {
+  g.undo();
+ }
+
+ if (g.history().length && g.turn()!==user) {
+  g.undo();
+ }
+
+ sel = null;
+ targets = [];
+ last = null;
+ busy = false;
+
+ draw();
+ status();
+}
+
+/* =================================
+   ПЕРЕКЛЮЧЕНИЕ РЕЖИМОВ
+================================= */
+
+function setMode(nextMode) {
+ mode = nextMode;
+
+ sel = null;
+ targets = [];
+ last = null;
+ busy = false;
+
+ $('play').style.display =
+  nextMode==='play'?'block':'none';
+
+ $('puz').style.display =
+  nextMode==='puz'?'flex':'none';
+
+ $('trainerPanel').style.display =
+  nextMode==='trainer'?'flex':'none';
+
+ $('analysisPanel').style.display =
+  nextMode==='analysis'?'flex':'none';
+
+ $('sidePlay').classList.toggle('active',nextMode==='play');
+ $('sidePuz').classList.toggle('active',nextMode==='puz');
+ $('sideTrainer').classList.toggle('active',nextMode==='trainer');
+ $('sideAnalysis').classList.toggle('active',nextMode==='analysis');
+
+ $('tp').classList.toggle('on',nextMode==='play');
+ $('tz').classList.toggle('on',nextMode==='puz');
+ $('tt').classList.toggle('on',nextMode==='trainer');
+ $('ta').classList.toggle('on',nextMode==='analysis');
+
+ const titles = {
+  play:'Настройки игры',
+  puz:'Шахматные задачи',
+  trainer:'Персональный тренер',
+  analysis:'Анализ партии'
+ };
+
+ $('panelTitle').textContent = titles[nextMode];
+
+ if (nextMode==='play') {
+  newGame();
+ }
+
+ if (nextMode==='puz') {
+  puzzleIndex = 0;
+  loadPuzzle();
+ }
+
+ if (nextMode==='trainer') {
+  $('boardTitle').textContent = 'Тренер';
+
+  showCoach(
+   'Тренер',
+   'Сделайте ход. Я помогу оценить позицию.'
+  );
+
+  draw();
+ }
+
+ if (nextMode==='analysis') {
+  $('boardTitle').textContent = 'Анализ партии';
+
+  showCoach(
+   'Анализ',
+   'Играйте партию и изучайте историю ходов.'
+  );
+
+  draw();
+ }
+}
+
+/* =================================
+   БОТЫ
+================================= */
+
+function refreshBotInfo() {
+ const level = Number($('lv').value);
+
+ const info = {
+  1:'Новичок: выбирает случайные ходы.',
+  2:'Любитель: играет спокойно и иногда ошибается.',
+  3:'Тактик: чаще выбирает активные ходы.',
+  4:'Стратег: старается улучшать позицию.',
+  5:'Эксперт: выбирает наиболее выгодные ходы из доступных.'
+ };
+
+ $('botinfo').textContent = info[level];
+
+ document.querySelectorAll('.bot-card').forEach(card => {
+  card.classList.toggle(
+   'selected',
+   Number(card.dataset.level)===level
+  );
+ });
+}
+
+document.querySelectorAll('.bot-card').forEach(card => {
+ card.addEventListener('click',() => {
+  $('lv').value = card.dataset.level;
+
+  refreshBotInfo();
+ });
+});
+
+/* =================================
+   КНОПКИ
+================================= */
+
+$('ng').onclick = newGame;
+
+$('playWhite').onclick = () => {
+ $('col').value = 'w';
+ newGame();
 };
 
-$('co').onclick=()=>{
-  showCoach('Тренер','Старайтесь контролировать центр, развивать фигуры и защищать короля.');
+$('playBlack').onclick = () => {
+ $('col').value = 'b';
+ newGame();
 };
 
-$('play').onclick=()=>setMode('play');
-$('puz').onclick=()=>setMode('puz');
+$('lv').onchange = refreshBotInfo;
 
-refreshBotInfo();
-newGame();
+$('col').onchange = newGame;
+
+$('undo').onclick = undoMove;
+
+$('hint').onclick = () => {
+ const best = chooseBotMove();
+
+ if (best) {
+  showCoach(
+   'Подсказка',
+   'Попробуйте ход '+best.from+' → '+best.to+'.'
+  );
+ }
+};
+
+$('tp').onclick = () => setMode('play');
+$('tz').onclick = () => setMode('puz');
+$('tt').onclick = () => setMode('trainer');
+$('ta').onclick = () => setMode('analysis');
+
+$('sidePlay').onclick = () => setMode('play');
+$('sidePuz').onclick = () => setMode('puz');
+$('sideTrainer').onclick = () => setMode('trainer');
+$('sideAnalysis').onclick = () => setMode('analysis');
+
+$('phint').onclick = giveHint;
+$('prevp').onclick = previousPuzzle;
+$('pn').onclick = nextPuzzle;
+$('shufflep').onclick = shufflePuzzles;
+
+$('analysisUndo').onclick = undoMove;
+
+$('analysisHint').onclick = () => {
+ const best = chooseBotMove();
+
+ if (best) {
+  showCoach(
+   'Анализ позиции',
+   'Один из перспективных ходов: '+best.from+' → '+best.to+'.'
+  );
+ }
+};
+
+$('trainerHint').onclick = () => {
+ const best = chooseBotMove();
+
+ if (!best) {
+  showCoach('Тренер','В этой позиции нет доступных ходов.');
+  return;
+ }
+
+ showCoach(
+  'Совет тренера',
+  'Попробуйте ход '+best.from+' → '+best.to+'.'
+ );
+};
+
+$('co').onchange = () => {
+ showCoach(
+  'Тренер',
+  $('co').checked
+   ? 'Оценка ходов включена.'
+   : 'Оценка ходов выключена.'
+ );
+};
+
+/* =================================
+   ЗАПУСК ПРИЛОЖЕНИЯ
+================================= */
+
+function startApp() {
+ if (typeof Chess==='undefined') {
+  showCoach(
+   'Ошибка загрузки',
+   'Не удалось загрузить шахматный движок. Проверьте подключение chess.js.'
+  );
+
+  return;
+ }
+
+ generatePuzzles();
+
+ refreshBotInfo();
+
+ newGame();
+
+ $('pcount').textContent = 'Решено: 0';
+ $('pstreak').textContent = 'Серия: 0';
+
+ console.log('Chess Master запущен.');
+ console.log('Количество задач:',PUZ.length);
+}
+
+startApp();
 
 </script>
+
 </body>
 </html>
