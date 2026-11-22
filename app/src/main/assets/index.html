@@ -659,10 +659,34 @@ button{font-family:inherit}
 </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<!-- Шахматный движок хранится локально в assets/js/chess.min.js -->
+<script src="js/chess.min.js"></script>
 
 <script>
 'use strict';
+
+/* =================================
+   ОБРАБОТКА ОШИБОК
+================================= */
+
+window.onerror = function(message,source,line){
+ const coach = document.getElementById('coach');
+
+ if(coach){
+  coach.innerHTML = '';
+
+  const title = document.createElement('b');
+  title.textContent = 'Ошибка JavaScript';
+
+  const text = document.createElement('span');
+  text.textContent = String(message)+' (строка '+line+')';
+
+  coach.appendChild(title);
+  coach.appendChild(text);
+ }
+
+ return false;
+};
 
 /* =================================
    СОСТОЯНИЕ И НАСТРОЙКИ
@@ -684,7 +708,7 @@ const VAL = {
 
 const $ = id => document.getElementById(id);
 
-let g = new Chess();
+let g = null;
 let mode = 'play';
 let sel = null;
 let targets = [];
@@ -726,18 +750,17 @@ function materialScore(game,color) {
 function evaluateMove(game,move,mover) {
  let score = materialScore(game,mover);
 
- if (game.in_checkmate()) score += 100000;
- else if (game.in_check()) score += 35;
-
- if (move.captured) score += VAL[move.captured]*0.65;
-
- if (move.promotion) score += VAL[move.promotion];
+ if (game.in_checkmate()) {
+  score += 100000;
+ } else if (game.in_check()) {
+  score += 35;
+ }
 
  return score;
 }
 
 /* =================================
-   ГЕНЕРАЦИЯ 50 РАЗНЫХ ПОЗИЦИЙ
+   ГЕНЕРАЦИЯ 50 ТРЕНИРОВОЧНЫХ ПОЗИЦИЙ
 ================================= */
 
 function generatePuzzles() {
@@ -865,6 +888,8 @@ function pieceAt(square) {
 }
 
 function draw() {
+ if (!g) return;
+
  const board = $('board');
 
  if (!board) return;
@@ -961,6 +986,8 @@ function draw() {
 }
 
 function status() {
+ if (!g) return;
+
  let message = '';
 
  if (g.in_checkmate()) {
@@ -996,6 +1023,8 @@ function showCoach(title,message) {
 ================================= */
 
 function chooseBotMove() {
+ if (!g) return null;
+
  const moves = g.moves({verbose:true});
 
  if (!moves.length) return null;
@@ -1010,7 +1039,7 @@ function chooseBotMove() {
  const scored = moves.map(move => {
   g.move(move);
 
-  let score = evaluateMove(g,move,mover);
+  const score = evaluateMove(g,move,mover);
 
   g.undo();
 
@@ -1035,12 +1064,12 @@ function chooseBotMove() {
 }
 
 function botMove() {
- if (g.game_over()) return;
+ if (!g || g.game_over()) return;
 
  busy = true;
 
  setTimeout(() => {
-  if (g.game_over()) {
+  if (!g || g.game_over()) {
    busy = false;
    return;
   }
@@ -1068,6 +1097,14 @@ function botMove() {
 ================================= */
 
 function newGame() {
+ if (typeof Chess==='undefined') {
+  showCoach(
+   'Ошибка загрузки',
+   'Не найден chess.js. Проверьте файл app/src/main/assets/js/chess.min.js.'
+  );
+  return;
+ }
+
  g = new Chess();
 
  mode = 'play';
@@ -1110,14 +1147,23 @@ function selectPiece(square) {
 }
 
 function onSquare(square) {
- if (busy || g.game_over()) return;
+ if (busy || !g || g.game_over()) return;
 
  if (mode==='puz') {
   puzzleClick(square);
   return;
  }
 
- if (g.turn()!==user) return;
+ /*
+  В обычной игре пользователь ходит только
+  за выбранный цвет. В тренере и анализе
+  разрешены ходы обеими сторонами.
+ */
+ const allowedColor = mode==='play'
+  ? user
+  : g.turn();
+
+ if (g.turn()!==allowedColor) return;
 
  const piece = pieceAt(square);
 
@@ -1140,15 +1186,20 @@ function onSquare(square) {
     draw();
     status();
 
-    if (!g.game_over() && g.turn()!==user) {
+    if (mode==='play' && !g.game_over() && g.turn()!==user) {
      botMove();
+    } else if (mode==='trainer') {
+     showCoach(
+      'Тренер',
+      'Ход выполнен. Проверьте, какие угрозы появились на доске.'
+     );
     }
 
     return;
    }
   }
 
-  if (piece && piece.color===user) {
+  if (piece && piece.color===allowedColor) {
    selectPiece(square);
   } else {
    sel = null;
@@ -1159,7 +1210,7 @@ function onSquare(square) {
   return;
  }
 
- if (piece && piece.color===user) {
+ if (piece && piece.color===allowedColor) {
   selectPiece(square);
  }
 }
@@ -1292,6 +1343,8 @@ function previousPuzzle() {
 function giveHint() {
  const task = PUZ[puzzleOrder[puzzleIndex]];
 
+ if (!task) return;
+
  showCoach('Подсказка 💡',task.h);
 }
 
@@ -1313,13 +1366,28 @@ function shufflePuzzles() {
 ================================= */
 
 function undoMove() {
- if (mode==='puz') return;
+ if (!g || mode==='puz') return;
 
- if (g.history().length) {
-  g.undo();
+ if (!g.history().length) {
+  showCoach('Отмена','Пока нет ходов для отмены.');
+  return;
  }
 
- if (g.history().length && g.turn()!==user) {
+ if (mode==='play') {
+  /*
+   В игре против бота отменяем последний
+   ход бота и предыдущий ход игрока.
+  */
+  g.undo();
+
+  if (g.history().length && g.turn()!==user) {
+   g.undo();
+  }
+ } else {
+  /*
+   В тренере и анализе отменяем только
+   один последний ход.
+  */
   g.undo();
  }
 
@@ -1330,6 +1398,8 @@ function undoMove() {
 
  draw();
  status();
+
+ showCoach('Отмена хода','Последний ход отменён.');
 }
 
 /* =================================
@@ -1389,7 +1459,7 @@ function setMode(nextMode) {
 
   showCoach(
    'Тренер',
-   'Сделайте ход. Я помогу оценить позицию.'
+   'Сделайте ход любой стороной. Я помогу оценить позицию.'
   );
 
   draw();
@@ -1400,7 +1470,7 @@ function setMode(nextMode) {
 
   showCoach(
    'Анализ',
-   'Играйте партию и изучайте историю ходов.'
+   'Играйте за белых и чёрных, изучайте историю ходов.'
   );
 
   draw();
@@ -1532,7 +1602,7 @@ function startApp() {
  if (typeof Chess==='undefined') {
   showCoach(
    'Ошибка загрузки',
-   'Не удалось загрузить шахматный движок. Проверьте подключение chess.js.'
+   'Не удалось загрузить шахматный движок. Проверьте наличие файла js/chess.min.js в assets.'
   );
 
   return;
