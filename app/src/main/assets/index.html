@@ -13,12 +13,12 @@ body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-
 .bw{flex:1 1 360px;max-width:560px;container-type:inline-size}
 .board{display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);width:100%;aspect-ratio:1/1;border-radius:6px;overflow:hidden;user-select:none}
 .sq{position:relative;display:flex;align-items:center;justify-content:center;font-size:10.5cqw;cursor:pointer;line-height:1;aspect-ratio:1/1;min-width:0;min-height:0;overflow:hidden}
-.sq span{display:block;line-height:1}
+.sq span{display:block;line-height:1;font-family:'Noto Sans Symbols 2','DejaVu Sans','Segoe UI Symbol',serif;font-weight:600}
 .l{background:var(--lt)}.d{background:var(--dk)}
-.sq.sel{box-shadow:inset 0 0 0 100px var(--sel)}
-.sq.last{box-shadow:inset 0 0 0 100px #f6f66966}
+.sq.sel{background-image:linear-gradient(var(--sel),var(--sel))}
+.sq.last{background-image:linear-gradient(#f6f66966,#f6f66966)}
 .sq.tg::after{content:"";width:28%;height:28%;border-radius:50%;background:#0003;position:absolute}
-.sq.chk{box-shadow:inset 0 0 0 100px #e5393588}
+.sq.chk{background-image:linear-gradient(#e5393588,#e5393588)}
 .w{color:#fff;text-shadow:0 0 2px #000,0 0 2px #000,0 0 1px #000}
 .b{color:#161616;text-shadow:0 0 1px #fff8}
 .panel{flex:1 1 280px;max-width:400px;background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px}
@@ -56,7 +56,7 @@ label{font-size:14px}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
 <script>
 const G={p:{w:'♔♕♖♗♘♙',b:'♚♛♜♝♞♟'}};
-const SYM={k:'♚\uFE0E',q:'♛\uFE0E',r:'♜\uFE0E',b:'♝\uFE0E',n:'♞\uFE0E',p:'♟\uFE0E'};
+const SYM={w:{k:'♔',q:'♕',r:'♖',b:'♗',n:'♘',p:'♙'},b:{k:'♚',q:'♛',r:'♜',b:'♝',n:'♞',p:'♟'}};
 const VAL={p:100,n:320,b:330,r:500,q:900,k:0};
 let g=new Chess(),mode='play',sel=null,targets=[],last=null,user='w',busy=false,pi=0,solved=0,flip=false;
 const $=id=>document.getElementById(id);
@@ -75,7 +75,7 @@ let v=1e9;for(const m of ms){g.move(m);v=Math.min(v,srch(d-1,a,b));g.undo();b=Ma
 function analyze(depth){const sg=g.turn()==='w'?1:-1,res={};let best=null;for(const m of g.moves({verbose:true})){g.move(m);const s=sg*srch(depth,-1e9,1e9);g.undo();res[m.san]=s;if(!best||s>best.s)best={san:m.san,s}}return{res,best}}
 function botMove(){const lv=+$('lv').value,ms=g.moves({verbose:true});if(!ms.length)return;
 let pick;if(lv===1){const an=analyze(0);const arr=ms.map(m=>({m,s:an.res[m.san]+Math.random()*300}));arr.sort((a,b)=>b.s-a.s);pick=arr[0].m}
-else{const sg=g.turn()==='w'?1:-1;let bs=-1e9;for(const m of ms){g.move(m);const s=sg*srch(lv===2?1:2,-1e9,1e9)+Math.random()*(lv===2?25:4);g.undo();if(s>bs){bs=s;pick=m}}}
+else{const sg=g.turn()==='w'?1:-1;let bs=-1e9;for(const m of ms){g.move(m);const s=sg*srch(1,-1e9,1e9)+Math.random()*(lv===2?25:4);g.undo();if(s>bs){bs=s;pick=m}}}
 g.move(pick);last=[pick.from,pick.to];busy=false;draw();status()}
 function draw(){const B=$('board');B.innerHTML='';const bd=g.board();
 const fl=mode==='play'?user==='b':flip;
@@ -83,7 +83,7 @@ for(let i=0;i<64;i++){const r=fl?7-Math.floor(i/8):Math.floor(i/8),c=fl?7-i%8:i%
 const d=document.createElement('div');d.className='sq '+((r+c)%2?'d':'l');
 if(sel===sq)d.classList.add('sel');if(last&&last.includes(sq))d.classList.add('last');if(targets.includes(sq))d.classList.add('tg');
 if(p&&p.type==='k'&&g.in_check()&&p.color===g.turn())d.classList.add('chk');
-if(p){const s=document.createElement('span');s.className=p.color;s.textContent=SYM[p.type];d.appendChild(s)}
+if(p){const s=document.createElement('span');s.className=p.color;s.textContent=SYM[p.color][p.type];d.appendChild(s)}
 d.onclick=()=>click(sq);B.appendChild(d)}
 const h=g.history();let t='';for(let i=0;i<h.length;i+=2)t+=(i/2+1)+'. '+h[i]+' '+(h[i+1]||'')+'  ';$('hist').textContent=t;$('hist').scrollTop=1e5}
 function status(){let s='';if(g.in_checkmate())s='Мат! '+(g.turn()==='w'?'Чёрные':'Белые')+' победили.';else if(g.in_draw())s='Ничья.';else if(mode==='play')s=g.turn()===user?'Ваш ход'+(g.in_check()?' (шах!)':''):'Бот думает…';
@@ -95,7 +95,7 @@ if(sel&&targets.includes(sq)){move(sel,sq);return}
 const p=g.get(sq);if(p&&p.color===g.turn()){sel=sq;targets=g.moves({square:sq,verbose:true}).map(m=>m.to)}else{sel=null;targets=[]}draw()}
 function move(f,t){sel=null;targets=[];
 if(mode==='puz'){const m=g.move({from:f,to:t,promotion:'q'});last=[f,t];if(g.in_checkmate()){solved++;draw();status();say('Верно! ✅','Это мат. Решено пазлов: '+solved+'. Жмите «Следующий».')}else{g.undo();last=null;draw();say('Не то ❌','Это не мат. Ищите ход с шахом, который не оставляет королю выхода.')}return}
-let an=null;if($('co').checked)an=analyze(2);
+let an=null;if($('co').checked)an=analyze(1);
 const m=g.move({from:f,to:t,promotion:'q'});last=[f,t];draw();
 if(an){const loss=an.best.s-an.res[m.san];let h,tx;
 if(g.in_checkmate()){h='Мат! 🏆';tx='Блестяще сыграно.'}
@@ -111,7 +111,7 @@ function setMode(m){mode=m;$('tp').classList.toggle('on',m==='play');$('tz').cla
 $('tp').onclick=()=>setMode('play');$('tz').onclick=()=>setMode('puz');
 $('ng').onclick=newGame;$('pn').onclick=()=>{pi++;loadPuz()};
 $('phint').onclick=()=>say('Подсказка 💡',PUZ[pi%PUZ.length].h);
-$('hint').onclick=()=>{if(busy||g.game_over()||g.turn()!==user)return;const a=analyze(2);say('Подсказка 💡','Рекомендую ход '+a.best.san+'.')};
+$('hint').onclick=()=>{if(busy||g.game_over()||g.turn()!==user)return;const a=analyze(1);say('Подсказка 💡','Рекомендую ход '+a.best.san+'.')};
 $('undo').onclick=()=>{if(busy)return;g.undo();if(g.turn()!==user)g.undo();last=null;sel=null;targets=[];draw();status()};
 setMode('play');
 </script></body></html>
